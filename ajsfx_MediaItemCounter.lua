@@ -114,6 +114,7 @@ function loop()
                          im.WindowFlags_NoFocusOnAppearing |
                          im.WindowFlags_NoMouseInputs
 
+    ---@diagnostic disable-next-line: missing-parameter
     im.PushFont(ctx, font)
     local visible, open = im.Begin(ctx, 'Item Counter Display', true, window_flags)
     
@@ -132,7 +133,7 @@ function loop()
             if r.GetMediaTrackInfo_Value(track, "B_SHOWINTCP") == 1 then
                 local item_count = r.CountTrackMediaItems(track)
                 
-                if item_count > 0 then
+                if item_count >= 0 then
                     local track_y = r.GetMediaTrackInfo_Value(track, "I_TCPY") / screen_scale
                     local track_h = r.GetMediaTrackInfo_Value(track, "I_TCPH") / screen_scale
                     
