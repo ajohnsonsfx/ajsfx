@@ -1,7 +1,7 @@
 -- @description Simple Item Counter
 -- @author Gemini Code Assist
--- @version 1.0
--- @changelog Initial release
+-- @version 1.2
+-- @changelog Moved settings to a separate script
 
 local r = reaper
 
@@ -18,27 +18,52 @@ end
 local ctx = im.CreateContext('Item Counter')
 
 --------------------------------
--- --- SCRIPT SETTINGS ---
+-- --- EXTSTATE CONFIG ---
 --------------------------------
-local FONT_SIZE = 12
-local FONT_NAME = "Arial"
-local TEXT_COLOR = 0x99FFFFFF -- White with 60% alpha (AABBGGRR format)
-local HORIZONTAL_OFFSET = 5  -- Pixels from the left edge of the arrange view
-local VERTICAL_ALIGN = 0.5   -- 0.0=top, 0.5=center, 1.0=bottom
+local EXT_SECTION = "ajsfx_MediaItemCounter"
+
+local function LoadConfig()
+    local cfg = {
+        FONT_SIZE = 12,
+        FONT_NAME = "Arial",
+        TEXT_COLOR = 0x99FFFFFF, -- White with 60% alpha (AABBGGRR format)
+        HORIZONTAL_OFFSET = 5,
+        VERTICAL_ALIGN = 0.5,
+        H_ALIGN = 0
+    }
+    
+    if r.HasExtState(EXT_SECTION, "FONT_SIZE") then cfg.FONT_SIZE = tonumber(r.GetExtState(EXT_SECTION, "FONT_SIZE")) or cfg.FONT_SIZE end
+    if r.HasExtState(EXT_SECTION, "TEXT_COLOR") then cfg.TEXT_COLOR = tonumber(r.GetExtState(EXT_SECTION, "TEXT_COLOR")) or cfg.TEXT_COLOR end
+    if r.HasExtState(EXT_SECTION, "HORIZONTAL_OFFSET") then cfg.HORIZONTAL_OFFSET = tonumber(r.GetExtState(EXT_SECTION, "HORIZONTAL_OFFSET")) or cfg.HORIZONTAL_OFFSET end
+    if r.HasExtState(EXT_SECTION, "VERTICAL_ALIGN") then cfg.VERTICAL_ALIGN = tonumber(r.GetExtState(EXT_SECTION, "VERTICAL_ALIGN")) or cfg.VERTICAL_ALIGN end
+    if r.HasExtState(EXT_SECTION, "H_ALIGN") then cfg.H_ALIGN = tonumber(r.GetExtState(EXT_SECTION, "H_ALIGN")) or cfg.H_ALIGN end
+    
+    return cfg
+end
+
+local Config = LoadConfig()
+local LAST_CONFIG_CHECK = r.time_precise()
+
 --------------------------------
 
 local font
-
--- Finds the arrange view window and prepares the overlay
 local arrange = r.JS_Window_FindChildByID(r.GetMainHwnd(), 0x3E8)
 local LEFT, TOP, RIGHT, BOT = 0, 0, 0, 0
 local WX, WY = 0, 0
 local scroll_size = 0
 local OLD_VAL = 0
 
+local function RecreateFont()
+    if font then im.Detach(ctx, font) end
+    font = im.CreateFont(Config.FONT_NAME, Config.FONT_SIZE)
+    im.Attach(ctx, font)
+end
+
 local function DrawOverArrange()
-    local _, DPI_RPR = r.get_config_var_string("uiscale")
-    scroll_size = 15 * (DPI_RPR or 1)
+    local _, DPI_RPR_str = r.get_config_var_string("uiscale")
+    local DPI_RPR = tonumber(DPI_RPR_str) or 1
+    if DPI_RPR == 0 then DPI_RPR = 1 end
+    scroll_size = 15 * DPI_RPR
     
     local _, orig_LEFT, orig_TOP, orig_RIGHT, orig_BOT = r.JS_Window_GetRect(arrange)
     local current_val = orig_TOP + orig_BOT + orig_LEFT + orig_RIGHT
@@ -48,20 +73,35 @@ local function DrawOverArrange()
         LEFT, TOP = im.PointConvertNative(ctx, orig_LEFT, orig_TOP)
         RIGHT, BOT = im.PointConvertNative(ctx, orig_RIGHT, orig_BOT)
     end
-    im.SetNextWindowPos(ctx, LEFT, TOP)
-    im.SetNextWindowSize(ctx, (RIGHT - LEFT) - scroll_size, (BOT - TOP) - scroll_size)
 end
 
 function loop()
+    -- Periodically check for config updates (e.g., from the settings script)
+    local current_time = r.time_precise()
+    if current_time - LAST_CONFIG_CHECK > 0.5 then
+        LAST_CONFIG_CHECK = current_time
+        local new_cfg = LoadConfig()
+        if new_cfg.FONT_SIZE ~= Config.FONT_SIZE or new_cfg.FONT_NAME ~= Config.FONT_NAME then
+            Config = new_cfg
+            RecreateFont()
+        else
+            Config = new_cfg
+        end
+    end
+
     if not (ctx and im.ValidatePtr(ctx, 'ImGui_Context*')) then
         ctx = im.CreateContext('Item Counter')
-        font = im.CreateFont(FONT_NAME, FONT_SIZE)
-        im.Attach(ctx, font)
+        RecreateFont()
     end
 
     DrawOverArrange()
     
-    -- Window flags for transparent, non-interactive overlay
+    --------------------------------
+    -- COUNTER OVERLAY
+    --------------------------------
+    im.SetNextWindowPos(ctx, LEFT, TOP)
+    im.SetNextWindowSize(ctx, (RIGHT - LEFT) - scroll_size, (BOT - TOP) - scroll_size)
+    
     local window_flags = im.WindowFlags_NoTitleBar |
                          im.WindowFlags_NoResize |
                          im.WindowFlags_NoNav |
@@ -69,11 +109,10 @@ function loop()
                          im.WindowFlags_NoDecoration |
                          im.WindowFlags_NoDocking |
                          im.WindowFlags_NoBackground |
-                         im.WindowFlags_NoInputs |
                          im.WindowFlags_NoMove |
                          im.WindowFlags_NoSavedSettings |
-                         im.WindowFlags_NoMouseInputs |
-                         im.WindowFlags_NoFocusOnAppearing
+                         im.WindowFlags_NoFocusOnAppearing |
+                         im.WindowFlags_NoMouseInputs
 
     im.PushFont(ctx, font)
     local visible, open = im.Begin(ctx, 'Item Counter Display', true, window_flags)
@@ -82,7 +121,8 @@ function loop()
         local draw_list = im.GetWindowDrawList(ctx)
         local WX, WY = im.GetWindowPos(ctx)
         
-        local _, screen_scale = r.get_config_var_string("uiscale")
+        local retval, screen_scale_str = r.get_config_var_string("uiscale")
+        local screen_scale = tonumber(screen_scale_str) or 1
         if screen_scale == 0 then screen_scale = 1 end
 
         local track_count = r.CountTracks(0)
@@ -101,10 +141,19 @@ function loop()
                         local text_w, text_h = im.CalcTextSize(ctx, text)
                         
                         -- Calculate position
-                        local text_x = WX + HORIZONTAL_OFFSET
-                        local text_y = WY + track_y + (track_h * VERTICAL_ALIGN) - (text_h * 0.5)
+                        local text_x = WX + Config.HORIZONTAL_OFFSET
                         
-                        im.DrawList_AddText(draw_list, text_x, text_y, TEXT_COLOR, text)
+                        if Config.H_ALIGN == 1 then -- Middle
+                            local view_width = RIGHT - LEFT
+                            text_x = WX + (view_width / 2) - (text_w / 2) + Config.HORIZONTAL_OFFSET
+                        elseif Config.H_ALIGN == 2 then -- Right
+                            local view_width = RIGHT - LEFT
+                            text_x = WX + view_width - text_w - scroll_size - Config.HORIZONTAL_OFFSET
+                        end
+                        
+                        local text_y = WY + track_y + (track_h * Config.VERTICAL_ALIGN) - (text_h * 0.5)
+                        
+                        im.DrawList_AddText(draw_list, text_x, text_y, Config.TEXT_COLOR, text)
                     end
                 end
             end
@@ -120,8 +169,7 @@ function loop()
 end
 
 function main()
-    font = im.CreateFont(FONT_NAME, FONT_SIZE)
-    im.Attach(ctx, font)
+    RecreateFont()
     loop()
 end
 
