@@ -1,9 +1,15 @@
 -- @description Media Item Counter Settings
--- @author Gemini Code Assist
+-- @author ajsfx
 -- @version 1.2
 -- @about Settings panel for ajsfx_MediaItemCounter
 
 local r = reaper
+
+-- Load core library
+local script_path = debug.getinfo(1, "S").source:match("@?(.*[\\/])")
+if not script_path then script_path = "" end
+package.path = script_path .. "?.lua;" .. package.path
+local core = require("lib.ajsfx_core")
 
 local success, im = pcall(function()
     package.path = r.ImGui_GetBuiltinPath() .. '/?.lua;' .. package.path
@@ -22,16 +28,7 @@ local ctx = im.CreateContext('Item Counter Settings')
 --------------------------------
 local EXT_SECTION = "ajsfx_MediaItemCounter"
 local PRESETS_SECTION = "ajsfx_MediaItemCounter_Presets"
-
-local DEFAULT_CONFIG = {
-    FONT_SIZE = 12,
-    FONT_NAME = "Arial",
-    TEXT_COLOR = 0x99FFFFFF, -- White with 60% alpha (AABBGGRR format)
-    HORIZONTAL_OFFSET = 5,
-    VERTICAL_ALIGN = 0.5,
-    H_ALIGN = 0, -- 0=Left, 1=Middle, 2=Right
-    REFRESH_RATE = 30 -- default 30 FPS
-}
+local DEFAULT_CONFIG = core.MEDIA_COUNTER_DEFAULTS
 
 --------------------------------
 -- --- CONFIG & PRESETS ---
@@ -48,19 +45,6 @@ local function CloneConfig(src)
     }
 end
 
-local function LoadConfig()
-    local cfg = CloneConfig(DEFAULT_CONFIG)
-    
-    if r.HasExtState(EXT_SECTION, "FONT_SIZE") then cfg.FONT_SIZE = tonumber(r.GetExtState(EXT_SECTION, "FONT_SIZE")) or cfg.FONT_SIZE end
-    if r.HasExtState(EXT_SECTION, "TEXT_COLOR") then cfg.TEXT_COLOR = tonumber(r.GetExtState(EXT_SECTION, "TEXT_COLOR")) or cfg.TEXT_COLOR end
-    if r.HasExtState(EXT_SECTION, "HORIZONTAL_OFFSET") then cfg.HORIZONTAL_OFFSET = tonumber(r.GetExtState(EXT_SECTION, "HORIZONTAL_OFFSET")) or cfg.HORIZONTAL_OFFSET end
-    if r.HasExtState(EXT_SECTION, "VERTICAL_ALIGN") then cfg.VERTICAL_ALIGN = tonumber(r.GetExtState(EXT_SECTION, "VERTICAL_ALIGN")) or cfg.VERTICAL_ALIGN end
-    if r.HasExtState(EXT_SECTION, "H_ALIGN") then cfg.H_ALIGN = tonumber(r.GetExtState(EXT_SECTION, "H_ALIGN")) or cfg.H_ALIGN end
-    if r.HasExtState(EXT_SECTION, "REFRESH_RATE") then cfg.REFRESH_RATE = tonumber(r.GetExtState(EXT_SECTION, "REFRESH_RATE")) or cfg.REFRESH_RATE end
-    
-    return cfg
-end
-
 local function SaveConfig(cfg)
     r.SetExtState(EXT_SECTION, "FONT_SIZE", tostring(cfg.FONT_SIZE), true)
     r.SetExtState(EXT_SECTION, "TEXT_COLOR", tostring(cfg.TEXT_COLOR), true)
@@ -70,7 +54,7 @@ local function SaveConfig(cfg)
     r.SetExtState(EXT_SECTION, "REFRESH_RATE", tostring(cfg.REFRESH_RATE), true)
 end
 
-local Config = LoadConfig()
+local Config = core.LoadMediaCounterConfig()
 
 -- PRESETS
 local preset_names = {"Default"}
@@ -78,16 +62,25 @@ local custom_presets = {} -- {name: {config}}
 local current_preset_idx = 0
 local new_preset_name = ""
 
+local MAX_PRESETS = 100 -- Safety limit to prevent runaway loading
+
 local function LoadPresets()
     preset_names = {"Default"}
     custom_presets = {}
-    
+
     if r.HasExtState(PRESETS_SECTION, "LIST") then
         local list_str = r.GetExtState(PRESETS_SECTION, "LIST")
         for name in list_str:gmatch("[^|]+") do
             if name ~= "" and name ~= "Default" then
-                local data_str = r.GetExtState(PRESETS_SECTION, "P_" .. name)
-                if data_str and data_str ~= "" then
+                if #preset_names >= MAX_PRESETS then
+                    core.Print("Warning: Preset limit reached (" .. MAX_PRESETS .. "), skipping remaining presets.")
+                    break
+                end
+
+                local ok, preset = pcall(function()
+                    local data_str = r.GetExtState(PRESETS_SECTION, "P_" .. name)
+                    if not data_str or data_str == "" then return nil end
+
                     local p_fs, p_tc, p_ho, p_va, p_ha, p_rr = data_str:match("([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+)")
                     if not p_rr then
                         p_fs, p_tc, p_ho, p_va, p_ha = data_str:match("([^,]+),([^,]+),([^,]+),([^,]+),([^,]+)")
@@ -98,18 +91,32 @@ local function LoadPresets()
                         p_ha = "0"
                         p_rr = "30"
                     end
-                    if p_fs and p_tc and p_ho and p_va and p_ha and p_rr then
-                        custom_presets[name] = {
-                            FONT_SIZE = tonumber(p_fs),
-                            FONT_NAME = "Arial",
-                            TEXT_COLOR = tonumber(p_tc),
-                            HORIZONTAL_OFFSET = tonumber(p_ho),
-                            VERTICAL_ALIGN = tonumber(p_va),
-                            H_ALIGN = tonumber(p_ha),
-                            REFRESH_RATE = tonumber(p_rr)
-                        }
-                        table.insert(preset_names, name)
-                    end
+                    if not (p_fs and p_tc and p_ho and p_va and p_ha and p_rr) then return nil end
+
+                    local fs = tonumber(p_fs)
+                    local tc = tonumber(p_tc)
+                    local ho = tonumber(p_ho)
+                    local va = tonumber(p_va)
+                    local ha = tonumber(p_ha)
+                    local rr = tonumber(p_rr)
+                    if not (fs and tc and ho and va and ha and rr) then return nil end
+
+                    return {
+                        FONT_SIZE = fs,
+                        FONT_NAME = DEFAULT_CONFIG.FONT_NAME,
+                        TEXT_COLOR = tc,
+                        HORIZONTAL_OFFSET = ho,
+                        VERTICAL_ALIGN = va,
+                        H_ALIGN = ha,
+                        REFRESH_RATE = rr
+                    }
+                end)
+
+                if ok and preset then
+                    custom_presets[name] = preset
+                    table.insert(preset_names, name)
+                elseif not ok then
+                    core.Print("Warning: Failed to load preset '" .. name .. "': " .. tostring(preset))
                 end
             end
         end
@@ -168,23 +175,6 @@ end
 LoadPresets()
 
 --------------------------------
-
--- Convert ImGui color formats
-local function ColorToRGBA(color)
-    local a = (color >> 24) & 0xFF
-    local b = (color >> 16) & 0xFF
-    local g = (color >> 8) & 0xFF
-    local r_val = color & 0xFF
-    return (r_val << 24) | (g << 16) | (b << 8) | a
-end
-
-local function RGBAToColor(color)
-    local a = color & 0xFF
-    local b = (color >> 8) & 0xFF
-    local g = (color >> 16) & 0xFF
-    local r_val = (color >> 24) & 0xFF
-    return (a << 24) | (b << 16) | (g << 8) | r_val
-end
 
 -- Double Click to Reset Helpers
 local function CheckDoubleClickReset(default_val, current_val)
@@ -279,9 +269,9 @@ function loop()
         local reset_rr, r_val_rr = CheckDoubleClickReset(DEFAULT_CONFIG.REFRESH_RATE, Config.REFRESH_RATE)
         if reset_rr then Config.REFRESH_RATE = r_val_rr; changed = true end
         
-        local rgba_color = ColorToRGBA(Config.TEXT_COLOR)
+        local rgba_color = core.ColorToRGBA(Config.TEXT_COLOR)
         local rv_c, new_color = im.ColorEdit4(ctx, "Text Color", rgba_color)
-        if rv_c then Config.TEXT_COLOR = RGBAToColor(new_color); changed = true end
+        if rv_c then Config.TEXT_COLOR = core.RGBAToColor(new_color); changed = true end
         local reset_tc, _ = CheckDoubleClickReset(DEFAULT_CONFIG.TEXT_COLOR, Config.TEXT_COLOR)
         if reset_tc then Config.TEXT_COLOR = DEFAULT_CONFIG.TEXT_COLOR; changed = true end
         
