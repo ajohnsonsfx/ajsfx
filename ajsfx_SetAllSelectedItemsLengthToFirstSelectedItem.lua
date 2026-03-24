@@ -12,7 +12,10 @@ local core = require("lib.ajsfx_core")
 
 core.Transaction("Match Item Lengths", function()
   local item_count = r.CountSelectedMediaItems(0)
-  if item_count < 2 then return end -- Need at least source + target
+  if item_count < 2 then
+    r.ShowConsoleMsg("ajsfx: Need at least 2 selected items to match lengths.\n")
+    return
+  end
   
   -- Get source length from first item
   local source_item = r.GetSelectedMediaItem(0, 0)

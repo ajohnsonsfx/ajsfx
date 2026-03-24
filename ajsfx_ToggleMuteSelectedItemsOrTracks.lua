@@ -37,63 +37,31 @@ core.Transaction("Smart Toggle Mute", function()
   end
   
   if #razor_items > 0 then
-    local any_unmuted = false
-    for _, item in ipairs(razor_items) do
-      if r.GetMediaItemInfo_Value(item, "B_MUTE") == 0 then
-        any_unmuted = true
-        break
-      end
-    end
-    
-    local new_state = any_unmuted and 1 or 0
-    for _, item in ipairs(razor_items) do
-      r.SetMediaItemInfo_Value(item, "B_MUTE", new_state)
-    end
-    
+    core.ToggleMuteItems(razor_items)
     r.UpdateArrange()
     return
   end
-  
+
   -- Priority 2: Selected Items
   local selected_item_count = r.CountSelectedMediaItems(0)
   if selected_item_count > 0 then
-    local any_unmuted = false
+    local selected_items = {}
     for i = 0, selected_item_count - 1 do
-      local item = r.GetSelectedMediaItem(0, i)
-      if r.GetMediaItemInfo_Value(item, "B_MUTE") == 0 then
-        any_unmuted = true
-        break
-      end
+      table.insert(selected_items, r.GetSelectedMediaItem(0, i))
     end
-    
-    local new_state = any_unmuted and 1 or 0
-    for i = 0, selected_item_count - 1 do
-      local item = r.GetSelectedMediaItem(0, i)
-      r.SetMediaItemInfo_Value(item, "B_MUTE", new_state)
-    end
-    
+    core.ToggleMuteItems(selected_items)
     r.UpdateArrange()
     return
   end
-  
+
   -- Priority 3: Selected Tracks
   local selected_track_count = r.CountSelectedTracks(0)
   if selected_track_count > 0 then
-    local any_unmuted = false
+    local selected_tracks = {}
     for i = 0, selected_track_count - 1 do
-      local track = r.GetSelectedTrack(0, i)
-      if r.GetMediaTrackInfo_Value(track, "B_MUTE") == 0 then
-        any_unmuted = true
-        break
-      end
+      table.insert(selected_tracks, r.GetSelectedTrack(0, i))
     end
-    
-    local new_state = any_unmuted and 1 or 0
-    for i = 0, selected_track_count - 1 do
-      local track = r.GetSelectedTrack(0, i)
-      r.SetMediaTrackInfo_Value(track, "B_MUTE", new_state)
-    end
-    
+    core.ToggleMuteTracks(selected_tracks)
     r.UpdateArrange()
     return
   end

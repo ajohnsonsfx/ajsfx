@@ -1,9 +1,15 @@
 -- @description Simple Item Counter
--- @author Gemini Code Assist
+-- @author ajsfx
 -- @version 1.2
 -- @changelog Moved settings to a separate script
 
 local r = reaper
+
+-- Load core library
+local script_path = debug.getinfo(1, "S").source:match("@?(.*[\\/])")
+if not script_path then script_path = "" end
+package.path = script_path .. "?.lua;" .. package.path
+local core = require("lib.ajsfx_core")
 
 local success, im = pcall(function()
     package.path = r.ImGui_GetBuiltinPath() .. '/?.lua;' .. package.path
@@ -18,32 +24,13 @@ end
 local ctx = im.CreateContext('Item Counter')
 
 --------------------------------
--- --- EXTSTATE CONFIG ---
+-- --- CONSTANTS ---
 --------------------------------
-local EXT_SECTION = "ajsfx_MediaItemCounter"
+local CONFIG_CHECK_INTERVAL = 0.5 -- seconds between config polls
+local DPI_SCROLL_SIZE = 15        -- base scrollbar width before DPI scaling
+local MIN_TRACK_HEIGHT = 10       -- minimum track height (px) to render counter
 
-local function LoadConfig()
-    local cfg = {
-        FONT_SIZE = 12,
-        FONT_NAME = "Arial",
-        TEXT_COLOR = 0x99FFFFFF, -- White with 60% alpha (AABBGGRR format)
-        HORIZONTAL_OFFSET = 5,
-        VERTICAL_ALIGN = 0.5,
-        H_ALIGN = 0,
-        REFRESH_RATE = 30
-    }
-    
-    if r.HasExtState(EXT_SECTION, "FONT_SIZE") then cfg.FONT_SIZE = tonumber(r.GetExtState(EXT_SECTION, "FONT_SIZE")) or cfg.FONT_SIZE end
-    if r.HasExtState(EXT_SECTION, "TEXT_COLOR") then cfg.TEXT_COLOR = tonumber(r.GetExtState(EXT_SECTION, "TEXT_COLOR")) or cfg.TEXT_COLOR end
-    if r.HasExtState(EXT_SECTION, "HORIZONTAL_OFFSET") then cfg.HORIZONTAL_OFFSET = tonumber(r.GetExtState(EXT_SECTION, "HORIZONTAL_OFFSET")) or cfg.HORIZONTAL_OFFSET end
-    if r.HasExtState(EXT_SECTION, "VERTICAL_ALIGN") then cfg.VERTICAL_ALIGN = tonumber(r.GetExtState(EXT_SECTION, "VERTICAL_ALIGN")) or cfg.VERTICAL_ALIGN end
-    if r.HasExtState(EXT_SECTION, "H_ALIGN") then cfg.H_ALIGN = tonumber(r.GetExtState(EXT_SECTION, "H_ALIGN")) or cfg.H_ALIGN end
-    if r.HasExtState(EXT_SECTION, "REFRESH_RATE") then cfg.REFRESH_RATE = tonumber(r.GetExtState(EXT_SECTION, "REFRESH_RATE")) or cfg.REFRESH_RATE end
-    
-    return cfg
-end
-
-local Config = LoadConfig()
+local Config = core.LoadMediaCounterConfig()
 local LAST_CONFIG_CHECK = r.time_precise()
 
 --------------------------------
@@ -69,7 +56,7 @@ local function DrawOverArrange()
     local _, DPI_RPR_str = r.get_config_var_string("uiscale")
     local DPI_RPR = tonumber(DPI_RPR_str) or 1
     if DPI_RPR == 0 then DPI_RPR = 1 end
-    scroll_size = 15 * DPI_RPR
+    scroll_size = DPI_SCROLL_SIZE * DPI_RPR
     
     local _, orig_LEFT, orig_TOP, orig_RIGHT, orig_BOT = r.JS_Window_GetRect(arrange)
     local current_val = orig_TOP + orig_BOT + orig_LEFT + orig_RIGHT
@@ -84,9 +71,9 @@ end
 function loop()
     -- Periodically check for config updates (e.g., from the settings script)
     local current_time = r.time_precise()
-    if current_time - LAST_CONFIG_CHECK > 0.5 then
+    if current_time - LAST_CONFIG_CHECK > CONFIG_CHECK_INTERVAL then
         LAST_CONFIG_CHECK = current_time
-        local new_cfg = LoadConfig()
+        local new_cfg = core.LoadMediaCounterConfig()
         if new_cfg.FONT_SIZE ~= Config.FONT_SIZE or new_cfg.FONT_NAME ~= Config.FONT_NAME then
             Config = new_cfg
             RecreateFont()
@@ -149,7 +136,7 @@ function loop()
             for i = 0, track_count - 1 do
                 local track = r.GetTrack(0, i)
                 
-                if r.GetMediaTrackInfo_Value(track, "B_SHOWINTCP") == 1 then
+                if core.IsTrackVisibleInArrangement(track) then
                     local track_y = r.GetMediaTrackInfo_Value(track, "I_TCPY") / screen_scale
                     
                     -- Early exit: stop iterating once we're past the visible bottom
@@ -158,7 +145,7 @@ function loop()
                     local track_h = r.GetMediaTrackInfo_Value(track, "I_TCPH") / screen_scale
 
                     -- Check if track is visible on screen before counting items
-                    if track_h > 10 and track_y + track_h > 0 then
+                    if track_h > MIN_TRACK_HEIGHT and track_y + track_h > 0 then
                         local item_count = CachedItemCounts[track]
                         if not item_count then
                             item_count = r.CountTrackMediaItems(track)
