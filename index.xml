@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <index version="1" name="ajsfx-Scripts">
   <category name="lib">
-    <reapack name="ajsfx_core.lua" type="data" desc="ajsfx Core Library">
+    <reapack name="ajsfx_core.lua" type="script desc="ajsfx Core Library">
       <version name="1.1">
         <source>https://github.com/ajohnsonsfx/ajsfx-Scripts/raw/main/lib/ajsfx_core.lua</source>
       </version>
