@@ -144,6 +144,13 @@ Keep these accurate when editing scripts.
 
 All scripts follow the pattern: `ajsfx_<Category>_<Description>.lua` or `ajsfx_<Description>.lua`. Use PascalCase for multi-word segments.
 
+## REAPER API Reference
+
+To look up REAPER API functions, fetch the community-maintained ReaScript documentation:
+- **URL:** `https://raw.githubusercontent.com/ReaTeam/Doc/master/reascripthelp.html`
+- Use `WebFetch` to retrieve it when needed for API lookups
+- This is equivalent to REAPER's Help > ReaScript Documentation output
+
 ## What to Ignore
 
 The `.gitignore` excludes:
