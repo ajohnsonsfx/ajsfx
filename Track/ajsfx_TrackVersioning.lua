@@ -29,14 +29,14 @@ local should_mute_archived = (mute_archived == "true")
 local date_format = r.GetExtState(section, "date_format")
 if date_format == "" then date_format = "%Y_%m%d" end
 
--- Helper: Parse track name (assumes format: name_vX_YYYY_MMDD)
+-- Helper: Parse track name (assumes format: name_vX_date)
+-- Returns base, version number, or nil, nil if the name doesn't match.
 local function parse_track_name(name)
-    local base, ver = name:match("(.+)_v(%d+)_.*")
+    local base, ver = name:match("(.+)_v(%d+)_")
     if base then
         return base, tonumber(ver)
     end
-    -- If no version string is found, treat the whole name as the base and start at v0.
-    return name, 0
+    return nil, nil
 end
 
 -- Helper: Generate new name
@@ -51,8 +51,8 @@ local function get_or_create_old_folder()
     for i = 0, num_tracks - 1 do
         local track = r.GetTrack(0, i)
         local _, name = r.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
-        -- Check if it's a top-level folder with the correct name
-        if name == folder_name and core.GetTrackDepth(track) == 0 then
+        -- Check if it's a folder track with the correct name (any depth)
+        if name == folder_name and r.GetMediaTrackInfo_Value(track, "I_FOLDERDEPTH") >= 1 then
             return track
         end
     end
@@ -123,7 +123,9 @@ core.Transaction("Track Versioning", function()
         local _, name = r.GetSetMediaTrackInfo_String(orig_parent, "P_NAME", "", false)
         local base, ver = parse_track_name(name)
 
-        if base and ver then
+        if not base then
+            r.MB(string.format("Track '%s' does not match the version format (name_vN_date). Skipping.", name), "Track Versioning", 0)
+        else
             -- Get current index and depth
             local parent_idx = math.floor(r.GetMediaTrackInfo_Value(orig_parent, "IP_TRACKNUMBER")) - 1
             local parent_depth = core.GetTrackDepth(orig_parent)
@@ -147,27 +149,17 @@ core.Transaction("Track Versioning", function()
             local new_name = generate_new_name(base, ver + 1)
             r.GetSetMediaTrackInfo_String(orig_parent, "P_NAME", new_name, true)
 
-            -- Archive duplicates (the current selection)
-            local dup_count = r.CountSelectedTracks(0)
-            for j = 0, dup_count - 1 do
-                local dup_t = r.GetSelectedTrack(0, j)
-                offline_all_fx(dup_t)
-                if j == 0 and should_mute_archived then
-                    r.SetMediaTrackInfo_Value(dup_t, "B_MUTE", 1)
-                end
+            -- Archive the duplicate root: offline its FX and mute it.
+            -- Children are left as-is; muting the root silences the whole group.
+            local dup_root = r.GetSelectedTrack(0, 0)
+            offline_all_fx(dup_root)
+            if should_mute_archived then
+                r.SetMediaTrackInfo_Value(dup_root, "B_MUTE", 1)
             end
 
-            -- Move duplicated group to "Old" folder
+            -- Move duplicated group into the "Old" folder (mode 1 = adopt as children)
             local old_idx = math.floor(r.GetMediaTrackInfo_Value(old_folder, "IP_TRACKNUMBER")) - 1
-            r.ReorderSelectedTracks(old_idx + 1, 0) -- Move to after the folder, with no folder creation
-
-            -- Indent the first of the moved tracks to make the whole group a child of the folder
-            local first_moved_track = r.GetTrack(0, old_idx + 1)
-            if first_moved_track then
-                r.SetMediaTrackInfo_Value(first_moved_track, "I_FOLDERDEPTH", 1)
-            end
-        else
-            core.Print(string.format("Track '%s' does not match expected format. Skipping.", name))
+            r.ReorderSelectedTracks(old_idx + 1, 1)
         end
     end
 
