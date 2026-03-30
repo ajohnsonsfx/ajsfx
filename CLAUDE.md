@@ -1,4 +1,4 @@
-# CLAUDE.md — ajsfx-Scripts
+# CLAUDE.md — ajsfx
 
 This file provides guidance for AI assistants working in this repository.
 
@@ -9,24 +9,19 @@ A collection of custom ReaScripts (Lua) for [REAPER](https://www.reaper.fm/), th
 ## Repository Structure
 
 ```
-ajsfx-Scripts/
-├── lib/
-│   └── ajsfx_core.lua                          # Shared core library
-├── ajsfx_GentleNormalizer.lua                   # ImGui GUI script
-├── ajsfx_MediaItemCounter.lua                   # ImGui overlay script (toggle)
-├── ajsfx_MediaItemCounter_Settings.lua          # ImGui settings panel for the counter
-├── ajsfx_SetAllSelectedItemsLengthToFirstSelectedItem.lua
-├── ajsfx_ToggleMuteSelectedItemsOrTracks.lua
-├── ajsfx_Track_CollapseVisibleChildrenAtHighestSelectedLevel.lua
-├── ajsfx_Track_CollapseVisibleChildrenAtLowestSelectedLevel.lua
-├── ajsfx_Track_UnCollapseVisibleChildrenAtHighestSelectedLevel.lua
-├── ajsfx_Track_UnCollapseVisibleChildrenAtLowestSelectedLevel.lua
+ajsfx/
+├── scripts/
+│   ├── Items/                                   # Media item scripts
+│   ├── Track/                                   # Track management scripts
+│   └── lib/
+│       └── ajsfx_core.lua                       # Shared core library
+├── docs/                                        # Sound design reference docs
 ├── CHANGELOG.md
 ├── README.md
 └── .gitignore
 ```
 
-## Core Library — `lib/ajsfx_core.lua`
+## Core Library — `scripts/lib/ajsfx_core.lua`
 
 All scripts (except the ImGui-heavy ones) require this library. It provides:
 
