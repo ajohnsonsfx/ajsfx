@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<index version="1" name="ajsfx" commit="498764ffcf155342c7f89e7416587c6bf89edd72">
+  <category name="scripts/Items">
+    <reapack name="ajsfx_GentleNormalizer.lua" type="script" desc="Gentle Normalizer">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Normalizes selected items to a target level with a strength percentage.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.2" author="ajsfx" time="2026-03-30T22:24:20Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/498764ffcf155342c7f89e7416587c6bf89edd72/scripts/Items/ajsfx_GentleNormalizer.lua</source>
+        <source file="../lib/ajsfx_core.lua">https://github.com/ajohnsonsfx/ajsfx/raw/498764ffcf155342c7f89e7416587c6bf89edd72/scripts/lib/ajsfx_core.lua</source>
+      </version>
+    </reapack>
+  </category>
+</index>
