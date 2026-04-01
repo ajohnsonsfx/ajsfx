@@ -5,7 +5,13 @@
       "WebSearch",
       "WebFetch(domain:www.reaper.fm)",
       "WebFetch(domain:forums.cockos.com)",
-      "Read(//c/Users/ajohn/AppData/Local/Temp/**)"
+      "Read(//c/Users/ajohn/AppData/Local/Temp/**)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:pixtur.github.io)",
+      "WebFetch(domain:deepwiki.com)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/cfillion/reaimgui/master/api/window.cpp\")"
     ]
   }
 }

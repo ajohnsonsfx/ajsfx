@@ -535,14 +535,18 @@ local function draw_preset_editor()
 
     im.SetNextWindowSize(ctx, 400, 0, im.Cond_Appearing)
     local visible, p_open = im.Begin(ctx, title .. "###preset_editor", true, im.WindowFlags_AlwaysAutoResize)
+    if not visible then
+        if not p_open then editing_preset = nil end
+        return editing_preset ~= nil
+    end
+
     if not p_open then
         editing_preset = nil
         im.End(ctx)
         return false
     end
 
-    if visible then
-        -- Preset name (only for new presets)
+    -- Preset name (only for new presets)
         if edit_is_new then
             local rv, val = im.InputText(ctx, "Preset Name", get_buf("pe_name", edit_new_preset_name))
             if rv then
@@ -677,7 +681,6 @@ local function draw_preset_editor()
         if im.Button(ctx, "Cancel") then
             editing_preset = nil
         end
-    end
     im.End(ctx)
     return editing_preset ~= nil
 end
@@ -980,8 +983,8 @@ local function Loop()
             end
         end
         if not can_generate then im.EndDisabled(ctx) end
+        im.End(ctx)
     end
-    im.End(ctx)
 
     -- Draw preset editor (separate window)
     draw_preset_editor()

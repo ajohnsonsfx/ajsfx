@@ -71,6 +71,19 @@ r.defer(Loop)
 
 ImGui contexts must be validated each frame with `im.ValidatePtr(ctx, 'ImGui_Context*')` and recreated if invalid.
 
+**Critical reaper-imgui `Begin`/`End` contract** — reaper-imgui's `im.Begin` wrapper differs from raw Dear ImGui: when `im.Begin` returns `false` (window collapsed or clipped), the wrapper **automatically calls `ImGui::End()` internally**. This means you must **only call `im.End(ctx)` when `im.Begin` returns `true`** (i.e. when `visible == true`). Calling `im.End` when `visible == false` results in a crash: `ImGui_End: Calling End() too many times!`
+
+Correct pattern:
+```lua
+local visible, open = im.Begin(ctx, "Window Title", true, flags)
+if visible then
+    -- draw content
+    im.End(ctx)  -- only called when visible=true
+end
+```
+
+The same rule applies to all top-level windows (including secondary windows like preset editors). `im.BeginChild`/`im.EndChild` are NOT affected — `EndChild` must always be called.
+
 ### Toggle scripts (like `ajsfx_MediaItemCounter.lua`)
 Scripts that run as toggleable REAPER actions use `r.get_action_context()` to get `cmdID`, then:
 - Set toggle state on start: `r.SetToggleCommandState(section, cmdID, 1)`
