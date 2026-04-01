@@ -1,0 +1,15 @@
+{
+	"mcpServers": {
+		"filesystem": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-filesystem",
+				"D:/GitHub/ajohnsonsfx/ajsfx"
+			],
+			"alwaysAllow": [
+				"read_multiple_files"
+			]
+		}
+	}
+}

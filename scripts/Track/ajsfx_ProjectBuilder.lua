@@ -525,6 +525,28 @@ local function get_buf(id, default)
 end
 
 --------------------------------
+-- --- GUI HELPERS ---
+--------------------------------
+local function draw_labeled_input_text(ctx, label, buf_id, current_val, input_width, label_width)
+    im.Text(ctx, label)
+    im.SameLine(ctx, label_width)
+    im.SetNextItemWidth(ctx, input_width)
+    local rv, val = im.InputText(ctx, "##" .. buf_id, current_val)
+    return rv, val
+end
+
+local function draw_labeled_input_int(ctx, label, current_val, input_width, label_width, min_val, max_val)
+    im.Text(ctx, label)
+    im.SameLine(ctx, label_width)
+    im.SetNextItemWidth(ctx, input_width)
+    local rv, val = im.InputInt(ctx, "##" .. label, current_val, 1, 1)
+    if rv then
+        val = math.max(min_val, math.min(max_val, val))
+    end
+    return rv, val
+end
+
+--------------------------------
 -- --- PRESET EDITOR UI ---
 --------------------------------
 local function draw_preset_editor()
@@ -688,8 +710,24 @@ end
 --------------------------------
 -- --- MAIN GUI ---
 --------------------------------
+local COLOR_SHARED = 0x88FF88FF -- Light Green
+local COLOR_INPUT = 0x88CCFFFF -- Light Blue
+local COLOR_DELIM = 0x888888FF -- Grey
+
+local function draw_preset_layout(ctx, sections, delimiter)
+    for i, s in ipairs(sections) do
+        local color = s.type == "shared" and COLOR_SHARED or COLOR_INPUT
+        im.TextColored(ctx, color, "[" .. s.label .. "]")
+        if i < #sections then
+            im.SameLine(ctx, 0, 0)
+            im.TextColored(ctx, COLOR_DELIM, delimiter)
+            im.SameLine(ctx, 0, 0)
+        end
+    end
+end
+
 local function draw_batch_list()
-    im.BeginChild(ctx, "batch_list", 160, -30, 1)
+    im.BeginChild(ctx, "batch_list", 200, -30, 1)
     im.SeparatorText(ctx, "Batches")
 
     local remove_idx = nil
@@ -738,28 +776,61 @@ local function draw_batch_config()
 
     -- Preset selector
     im.SeparatorText(ctx, "Name Preset")
-    im.SetNextItemWidth(ctx, 200)
-    if im.BeginCombo(ctx, "Preset", batch.preset_name) then
+
+    -- Calculate widths for full-width layout
+    local avail_w = im.GetContentRegionAvail(ctx)
+    local has_delete = not is_default_preset(batch.preset_name)
+    local num_btns = has_delete and 3 or 2
+    -- Get style items correctly, in reaper-imgui we need to extract them or just hardcode/use reasonable defaults
+    local item_spacing_x = 8 -- typical default
+    local btn_w = 40
+    local btns_total_w = (btn_w * num_btns) + (item_spacing_x * num_btns)
+    local combo_w = avail_w - btns_total_w
+
+    -- Draw Combo
+    local start_cursor_x = im.GetCursorPosX(ctx)
+    local start_cursor_y = im.GetCursorPosY(ctx)
+    
+    im.SetNextItemWidth(ctx, combo_w)
+    if im.BeginCombo(ctx, "##PresetCombo", "") then
         for _, p in ipairs(all_presets) do
-            if im.Selectable(ctx, p.name, batch.preset_name == p.name) then
-                -- Switch preset: reset sections and values
+            local is_selected = batch.preset_name == p.name
+            if im.Selectable(ctx, p.name .. "##" .. p.name, is_selected) then
                 batch.preset_name = p.name
                 batch.delimiter = p.delimiter
                 batch.sections = deep_copy_sections(p.sections)
                 batch.shared_values = {}
-                -- Clear input buffers for this batch
                 for k, _ in pairs(input_buffers) do
                     if k:find("^" .. bid) then input_buffers[k] = nil end
                 end
                 sync_batch_groups(batch)
             end
+            
+            im.SameLine(ctx, 150)
+            draw_preset_layout(ctx, p.sections, p.delimiter)
         end
         im.EndCombo(ctx)
     end
 
-    im.SameLine(ctx)
-    if im.SmallButton(ctx, "Edit") then
-        -- Find and copy current preset for editing
+    -- Draw Custom Preview over the combo
+    local end_cursor_x = im.GetCursorPosX(ctx)
+    local end_cursor_y = im.GetCursorPosY(ctx)
+    
+    -- Move cursor back to draw inside the combo box
+    local frame_padding_x = 4
+    local frame_padding_y = 4
+    im.SetCursorPosX(ctx, start_cursor_x + frame_padding_x)
+    im.SetCursorPosY(ctx, start_cursor_y + frame_padding_y)
+    
+    im.Text(ctx, batch.preset_name)
+    im.SameLine(ctx, start_cursor_x + 150)
+    draw_preset_layout(ctx, batch.sections, batch.delimiter)
+    
+    -- Restore cursor position for next items on the same line
+    im.SetCursorPosX(ctx, start_cursor_x + combo_w + item_spacing_x)
+    im.SetCursorPosY(ctx, start_cursor_y)
+
+    if im.Button(ctx, "Edit", btn_w, 0) then
         for _, p in ipairs(all_presets) do
             if p.name == batch.preset_name then
                 editing_preset = {
@@ -778,7 +849,7 @@ local function draw_batch_config()
     end
 
     im.SameLine(ctx)
-    if im.SmallButton(ctx, "New") then
+    if im.Button(ctx, "New", btn_w, 0) then
         editing_preset = {
             name = "",
             delimiter = "_",
@@ -791,11 +862,10 @@ local function draw_batch_config()
         input_buffers["pe_sec_1"] = ""
     end
 
-    im.SameLine(ctx)
-    if not is_default_preset(batch.preset_name) then
-        if im.SmallButton(ctx, "Delete") then
+    if has_delete then
+        im.SameLine(ctx)
+        if im.Button(ctx, "Delete", btn_w, 0) then
             all_presets = delete_custom_preset(all_presets, batch.preset_name)
-            -- Reset batch to first preset
             local p = all_presets[1]
             batch.preset_name = p.name
             batch.delimiter = p.delimiter
@@ -805,28 +875,23 @@ local function draw_batch_config()
         end
     end
 
-    -- Delimiter (per-batch override)
-    im.SetNextItemWidth(ctx, 50)
-    local rv_d, val_d = im.InputText(ctx, "Delimiter", get_buf(bid .. "delim", batch.delimiter))
-    if rv_d then
-        batch.delimiter = val_d
-        input_buffers[bid .. "delim"] = val_d
-    end
+    im.Spacing(ctx)
+    im.Spacing(ctx)
+    im.SeparatorText(ctx, "Global Format Options")
 
-    -- Shared sections
+    -- Combine Delimiter, FX Aux Names, and Shared Sections into one area
+    
+    -- Shared sections first
     local has_shared = false
     for _, s in ipairs(batch.sections) do
         if s.type == "shared" then has_shared = true; break end
     end
 
     if has_shared then
-        im.Spacing(ctx)
-        im.SeparatorText(ctx, "Shared Sections")
         for _, s in ipairs(batch.sections) do
             if s.type == "shared" then
                 local buf_id = bid .. "sv_" .. s.label
-                im.SetNextItemWidth(ctx, 250)
-                local rv, val = im.InputText(ctx, s.label, get_buf(buf_id, batch.shared_values[s.label] or ""))
+                local rv, val = draw_labeled_input_text(ctx, s.label .. " (Shared)", buf_id, get_buf(buf_id, batch.shared_values[s.label] or ""), 200, 120)
                 if rv then
                     batch.shared_values[s.label] = val
                     input_buffers[buf_id] = val
@@ -835,43 +900,45 @@ local function draw_batch_config()
         end
     end
 
-    -- Track counts
-    im.Spacing(ctx)
-    im.SeparatorText(ctx, "Track Structure")
-
-    im.SetNextItemWidth(ctx, 100)
-    local rv_g, val_g = im.InputInt(ctx, "# of Groups", batch.num_groups, 1, 1)
-    if rv_g then
-        batch.num_groups = math.max(1, math.min(MAX_GROUPS, val_g))
-        sync_batch_groups(batch)
-    end
-
-    im.SetNextItemWidth(ctx, 100)
-    local rv_a, val_a = im.InputInt(ctx, "# of FX Auxes", batch.num_aux, 1, 1)
-    if rv_a then
-        batch.num_aux = math.max(0, math.min(MAX_AUX, val_a))
-        sync_batch_aux_names(batch)
-    end
-
-    im.SetNextItemWidth(ctx, 100)
-    local rv_c, val_c = im.InputInt(ctx, "# of Content Tracks", batch.num_content, 1, 1)
-    if rv_c then
-        batch.num_content = math.max(0, math.min(MAX_CONTENT, val_c))
+    -- Delimiter
+    local rv_d, val_d = draw_labeled_input_text(ctx, "Delimiter", bid .. "delim", get_buf(bid .. "delim", batch.delimiter), 200, 120)
+    if rv_d then
+        batch.delimiter = val_d
+        input_buffers[bid .. "delim"] = val_d
     end
 
     -- FX Aux names
     if batch.num_aux > 0 then
-        im.Spacing(ctx)
-        im.SeparatorText(ctx, "FX Aux Names")
         for i = 1, batch.num_aux do
             local buf_id = bid .. "aux_" .. i
-            im.SetNextItemWidth(ctx, 200)
-            local rv, val = im.InputText(ctx, "FX " .. i, get_buf(buf_id, batch.aux_names[i] or ("FX_" .. i)))
+            local rv, val = draw_labeled_input_text(ctx, "FX " .. i .. " Name", buf_id, get_buf(buf_id, batch.aux_names[i] or ("FX_" .. i)), 200, 120)
             if rv then
                 batch.aux_names[i] = val
                 input_buffers[buf_id] = val
             end
         end
+    end
+
+    -- Track counts
+    im.Spacing(ctx)
+    im.Spacing(ctx)
+    im.SeparatorText(ctx, "Track Structure")
+
+    local rv_g, val_g = draw_labeled_input_int(ctx, "# of Groups", batch.num_groups, 100, 150, 1, MAX_GROUPS)
+    if rv_g then
+        batch.num_groups = val_g
+        sync_batch_groups(batch)
+    end
+
+    local rv_a, val_a = draw_labeled_input_int(ctx, "# of FX Auxes", batch.num_aux, 100, 150, 0, MAX_AUX)
+    if rv_a then
+        batch.num_aux = val_a
+        sync_batch_aux_names(batch)
+    end
+
+    local rv_c, val_c = draw_labeled_input_int(ctx, "# of Content Tracks", batch.num_content, 100, 150, 0, MAX_CONTENT)
+    if rv_c then
+        batch.num_content = val_c
     end
 
     -- Group input sections table
@@ -892,7 +959,7 @@ local function draw_batch_config()
             -- Headers
             im.TableSetupColumn(ctx, "#", im.TableColumnFlags_WidthFixed, 30)
             for _, s in ipairs(input_sections) do
-                im.TableSetupColumn(ctx, s.label, im.TableColumnFlags_WidthFixed, 140)
+                im.TableSetupColumn(ctx, s.label, im.TableColumnFlags_WidthFixed, 160)
             end
             im.TableSetupColumn(ctx, "Preview", im.TableColumnFlags_WidthStretch)
             im.TableHeadersRow(ctx)
