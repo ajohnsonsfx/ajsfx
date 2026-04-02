@@ -1,0 +1,60 @@
+# Coding Patterns & Standards
+
+## Simple Action Patterns (non-GUI)
+These wrap logic in `core.Transaction()` for undo support and UI refresh batching:
+
+```lua
+local r = reaper
+local script_path = debug.getinfo(1, "S").source:match("@?(.*[\\/])")
+if not script_path then script_path = "" end
+package.path = script_path .. "?.lua;" .. package.path
+
+local core = require("lib.ajsfx_core")
+
+core.Transaction("Undo Block Name", function()
+  -- logic here
+end)
+```
+
+## ImGui `Begin/End` Contracts
+Scripts with persistent windows use `reaper-imgui` (v0.9.3) via a deferred loop.
+When `im.Begin` returns `false` (window collapsed or clipped), the wrapper **automatically calls `ImGui::End()` internally**.
+
+**Correct pattern:**
+```lua
+local visible, open = im.Begin(ctx, "Window Title", true, flags)
+if visible then
+    -- draw content
+    im.End(ctx)  -- only called when visible=true
+end
+```
+*Note: `im.BeginChild`/`im.EndChild` always require a matching `EndChild`.*
+
+## `ExtState` Persistence
+Settings are persisted using REAPER's `ExtState` API:
+- **Read**: `r.GetExtState(section, key)` / `r.HasExtState(section, key)`
+- **Write**: `r.SetExtState(section, key, value, true)` — `true` = persist to disk
+- **Delete**: `r.DeleteExtState(section, key, true)`
+
+## Color Formats
+Colors use REAPER's `AABBGGRR` integer format. Use helper functions `ColorToRGBA` / `RGBAToColor` to convert to/from ImGui's `RGBA`.
+
+## ReaPack Metadata Requirements
+Every script requires metadata headers:
+```lua
+-- @description Human-readable name
+-- @author ajsfx
+-- @version X.Y
+-- @about Brief description
+```
+
+### `@provides` Block
+If using a shared library, explicitly provide the script itself:
+```lua
+-- @provides
+--   [main] .
+--   [nomain] ../lib/ajsfx_core.lua
+```
+
+## File Naming
+`ajsfx_<Category>_<Description>.lua` or `ajsfx_<Description>.lua` (PascalCase).
