@@ -167,5 +167,18 @@ test("Resolves wildcard in shared value", function()
   assert_eq(result, expected)
 end)
 
+test("ResolveGroupName returns empty-joined string for out-of-bounds group_index", function()
+  local batch = {
+    sections = {
+      { type = "input", label = "Name" },
+    },
+    shared_values = {},
+    groups = { [1] = { Name = "Hero" } },
+  }
+  -- group_index 2 doesn't exist — should return "" not error
+  local result = core.naming.ResolveGroupName(batch, 2)
+  assert_eq(result, "")
+end)
+
 print("\nAll done: " .. passed .. " passed, " .. failed .. " failed")
 if failed > 0 then os.exit(1) end
