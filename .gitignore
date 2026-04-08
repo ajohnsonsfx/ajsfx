@@ -1,5 +1,5 @@
 .clinerules
-plans/
+/plans/
 .vscode/
 *.bak
 *.RPP-bak
