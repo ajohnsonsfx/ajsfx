@@ -342,10 +342,7 @@ local all_presets    = core.naming.LoadAllPresets(PRESETS_SECTION, DEFAULT_PRESE
 local batches        = load_session() or {}
 local selected_batch = #batches > 0 and 1 or 0
 
--- Preset editor state
-local editing_preset = nil -- nil = not editing, table = the preset being edited
-local edit_new_preset_name = ""
-local edit_is_new = false
+local save_dialog_name = ""
 
 -- Input buffers for ImGui (keyed by unique id)
 local input_buffers = {}
@@ -380,160 +377,6 @@ local function draw_labeled_input_int(ctx, label, current_val, input_width, labe
 end
 
 --------------------------------
--- --- PRESET EDITOR UI ---
---------------------------------
-local function draw_preset_editor()
-    if not editing_preset then return false end
-
-    local open = true
-    local title = edit_is_new and "New Preset" or ("Edit Preset: " .. editing_preset.name)
-
-    im.SetNextWindowSize(ctx, 400, 0, im.Cond_Appearing)
-    local visible, p_open = im.Begin(ctx, title .. "###preset_editor", true, im.WindowFlags_AlwaysAutoResize)
-    if not visible then
-        if not p_open then editing_preset = nil end
-        return editing_preset ~= nil
-    end
-
-    if not p_open then
-        editing_preset = nil
-        im.End(ctx)
-        return false
-    end
-
-    -- Preset name (only for new presets)
-        if edit_is_new then
-            local rv, val = im.InputText(ctx, "Preset Name", get_buf("pe_name", edit_new_preset_name))
-            if rv then
-                edit_new_preset_name = val
-                input_buffers["pe_name"] = val
-            end
-            im.Spacing(ctx)
-        end
-
-        im.Spacing(ctx)
-        im.SeparatorText(ctx, "Sections")
-
-        -- Section list
-        local remove_idx = nil
-        local swap_a, swap_b = nil, nil
-
-        for i, s in ipairs(editing_preset.sections) do
-            im.PushID(ctx, i)
-
-            -- Type dropdown
-            im.SetNextItemWidth(ctx, 80)
-            if im.BeginCombo(ctx, "##type", s.type) then
-                if im.Selectable(ctx, "shared", s.type == "shared") then s.type = "shared" end
-                if im.Selectable(ctx, "input", s.type == "input") then s.type = "input" end
-                im.EndCombo(ctx)
-            end
-
-            im.SameLine(ctx)
-
-            -- Label
-            im.SetNextItemWidth(ctx, 150)
-            local buf_id = "pe_sec_" .. i
-            local rv_l, val_l = im.InputText(ctx, "##label", get_buf(buf_id, s.label))
-            if rv_l then
-                s.label = val_l
-                input_buffers[buf_id] = val_l
-            end
-
-            im.SameLine(ctx)
-
-            -- Move up
-            if i > 1 then
-                if im.SmallButton(ctx, "^") then swap_a, swap_b = i, i - 1 end
-            else
-                im.SmallButton(ctx, " ")
-            end
-
-            im.SameLine(ctx)
-
-            -- Move down
-            if i < #editing_preset.sections then
-                if im.SmallButton(ctx, "v") then swap_a, swap_b = i, i + 1 end
-            else
-                im.SmallButton(ctx, " ")
-            end
-
-            im.SameLine(ctx)
-
-            -- Delete
-            if im.SmallButton(ctx, "x") then remove_idx = i end
-
-            im.PopID(ctx)
-        end
-
-        -- Apply moves/removes
-        if swap_a and swap_b then
-            editing_preset.sections[swap_a], editing_preset.sections[swap_b] =
-                editing_preset.sections[swap_b], editing_preset.sections[swap_a]
-            -- Swap buffers too
-            local ba = "pe_sec_" .. swap_a
-            local bb = "pe_sec_" .. swap_b
-            input_buffers[ba], input_buffers[bb] = input_buffers[bb], input_buffers[ba]
-        end
-        if remove_idx then
-            table.remove(editing_preset.sections, remove_idx)
-            -- Rebuild section buffers
-            for i, s in ipairs(editing_preset.sections) do
-                input_buffers["pe_sec_" .. i] = s.label
-            end
-        end
-
-        im.Spacing(ctx)
-        if im.Button(ctx, "+ Add Section") and #editing_preset.sections < MAX_SECTIONS then
-            editing_preset.sections[#editing_preset.sections + 1] = { type = "shared", label = "" }
-            input_buffers["pe_sec_" .. #editing_preset.sections] = ""
-        end
-
-        im.Spacing(ctx)
-        im.Separator(ctx)
-        im.Spacing(ctx)
-
-        -- Save / Cancel
-        local can_save = #editing_preset.sections > 0
-        if edit_is_new then
-            can_save = can_save and edit_new_preset_name ~= "" and not core.naming.IsDefaultPreset(edit_new_preset_name, DEFAULT_PRESETS)
-        end
-
-        if not can_save then im.BeginDisabled(ctx) end
-        if im.Button(ctx, "Save") then
-            if edit_is_new then
-                editing_preset.name = edit_new_preset_name
-                -- Check for duplicate names
-                local dupe = false
-                for _, p in ipairs(all_presets) do
-                    if p.name == editing_preset.name then dupe = true; break end
-                end
-                if not dupe then
-                    all_presets[#all_presets + 1] = editing_preset
-                end
-            else
-                -- Update existing
-                for i, p in ipairs(all_presets) do
-                    if p.name == editing_preset.name then
-                        all_presets[i] = editing_preset
-                        break
-                    end
-                end
-            end
-            core.naming.SaveCustomPresets(PRESETS_SECTION, all_presets, DEFAULT_PRESETS)
-            editing_preset = nil
-        end
-        if not can_save then im.EndDisabled(ctx) end
-
-        im.SameLine(ctx)
-        if im.Button(ctx, "Cancel") then
-            editing_preset = nil
-        end
-    im.End(ctx)
-    return editing_preset ~= nil
-end
-
---------------------------------
 -- --- MAIN GUI ---
 --------------------------------
 local COLOR_SHARED = 0x88FF88FF -- Light Green
@@ -561,79 +404,208 @@ local function draw_batch_config()
     local batch = batches[selected_batch]
     local bid = "b" .. selected_batch .. "_"
 
-    -- Preset selector
+    -- ── NAME PRESET ──────────────────────────────────────────────────────────
     im.SeparatorText(ctx, "Name Preset")
 
-    -- Calculate widths for full-width layout
     local avail_w = im.GetContentRegionAvail(ctx)
-    local has_delete = not core.naming.IsDefaultPreset(batch.preset_name, DEFAULT_PRESETS)
-    local num_btns = has_delete and 3 or 2
-    -- Get style items correctly, in reaper-imgui we need to extract them or just hardcode/use reasonable defaults
-    local item_spacing_x = 8 -- typical default
-    local btn_w = 40
-    local btns_total_w = (btn_w * num_btns) + (item_spacing_x * num_btns)
-    local combo_w = avail_w - btns_total_w
+    local btn_w   = 50
+    local n_btns  = core.naming.IsDefaultPreset(batch.preset_name, DEFAULT_PRESETS) and 2 or 3
+    local combo_w = avail_w - (btn_w * n_btns) - (8 * n_btns)
 
     im.SetNextItemWidth(ctx, combo_w)
     if im.BeginCombo(ctx, "##PresetCombo", batch.preset_name) then
         for _, p in ipairs(all_presets) do
             local is_selected = batch.preset_name == p.name
             if im.Selectable(ctx, p.name .. "##" .. p.name, is_selected) then
-                batch.preset_name = p.name
-                batch.sections = deep_copy_sections(p.sections)
+                batch.preset_name   = p.name
+                batch.sections      = deep_copy_sections(p.sections)
                 batch.shared_values = {}
-                for k, _ in pairs(input_buffers) do
+                for k in pairs(input_buffers) do
                     if k:find("^" .. bid) then input_buffers[k] = nil end
                 end
                 sync_batch_groups(batch)
             end
-
-            im.SameLine(ctx, 150)
-            draw_preset_layout(ctx, p.sections, core.settings.Load().delimiter)
         end
         im.EndCombo(ctx)
     end
 
     im.SameLine(ctx)
-    if im.Button(ctx, "Edit", btn_w, 0) then
-        for _, p in ipairs(all_presets) do
-            if p.name == batch.preset_name then
-                editing_preset = {
-                    name = p.name,
-                    sections = deep_copy_sections(p.sections),
-                }
-                edit_is_new = false
-                for i, s in ipairs(editing_preset.sections) do
-                    input_buffers["pe_sec_" .. i] = s.label
-                end
-                break
-            end
-        end
+    if im.Button(ctx, "Save##preset", btn_w, 0) then
+        save_dialog_name = batch.preset_name
+        input_buffers["save_name"] = batch.preset_name
+        im.OpenPopup(ctx, "##save_preset_dialog")
     end
 
     im.SameLine(ctx)
-    if im.Button(ctx, "New", btn_w, 0) then
-        editing_preset = {
-            name = "",
-            sections = { { type = "shared", label = "" } },
-        }
-        edit_is_new = true
-        edit_new_preset_name = ""
-        input_buffers["pe_name"] = ""
-        input_buffers["pe_sec_1"] = ""
+    if im.Button(ctx, "New##preset", btn_w, 0) then
+        local new_p = { name = "New Preset", sections = { { type = "input", label = "Name" } } }
+        all_presets[#all_presets + 1] = new_p
+        core.naming.SaveCustomPresets(PRESETS_SECTION, all_presets, DEFAULT_PRESETS)
+        batch.preset_name   = new_p.name
+        batch.sections      = deep_copy_sections(new_p.sections)
+        batch.shared_values = {}
+        sync_batch_groups(batch)
     end
 
-    if has_delete then
+    if not core.naming.IsDefaultPreset(batch.preset_name, DEFAULT_PRESETS) then
         im.SameLine(ctx)
-        if im.Button(ctx, "Delete", btn_w, 0) then
+        if im.Button(ctx, "Del##preset", btn_w, 0) then
             all_presets = core.naming.DeleteCustomPreset(PRESETS_SECTION, all_presets, batch.preset_name, DEFAULT_PRESETS)
             local p = all_presets[1]
-            batch.preset_name = p.name
-            batch.sections = deep_copy_sections(p.sections)
+            batch.preset_name   = p.name
+            batch.sections      = deep_copy_sections(p.sections)
             batch.shared_values = {}
             sync_batch_groups(batch)
         end
     end
+
+    -- Save dialog popup
+    if im.BeginPopup(ctx, "##save_preset_dialog") then
+        im.Text(ctx, "Save preset as:")
+        im.SetNextItemWidth(ctx, 220)
+        local rv, val = im.InputText(ctx, "##save_name", get_buf("save_name", save_dialog_name))
+        if rv then
+            save_dialog_name = val
+            input_buffers["save_name"] = val
+        end
+
+        local name_exists = false
+        for _, p in ipairs(all_presets) do
+            if p.name == save_dialog_name then name_exists = true; break end
+        end
+        local is_default = core.naming.IsDefaultPreset(save_dialog_name, DEFAULT_PRESETS)
+
+        if name_exists then
+            im.TextColored(ctx, 0xFFAA44FF, "\xe2\x9a\xa0 \"" .. save_dialog_name .. "\" already exists. Overwrite?")
+        end
+        im.Spacing(ctx)
+
+        if im.Button(ctx, "Cancel##save", 80, 0) then
+            im.CloseCurrentPopup(ctx)
+        end
+        im.SameLine(ctx)
+
+        local can_save = save_dialog_name ~= "" and not is_default
+        if not can_save then im.BeginDisabled(ctx) end
+        local confirm_label = name_exists and "Overwrite" or "Save"
+        if im.Button(ctx, confirm_label .. "##save_confirm", 80, 0) then
+            local found = false
+            for idx, p in ipairs(all_presets) do
+                if p.name == save_dialog_name then
+                    all_presets[idx] = { name = save_dialog_name, sections = deep_copy_sections(batch.sections) }
+                    found = true
+                    break
+                end
+            end
+            if not found then
+                all_presets[#all_presets + 1] = { name = save_dialog_name, sections = deep_copy_sections(batch.sections) }
+            end
+            batch.preset_name = save_dialog_name
+            core.naming.SaveCustomPresets(PRESETS_SECTION, all_presets, DEFAULT_PRESETS)
+            im.CloseCurrentPopup(ctx)
+        end
+        if not can_save then im.EndDisabled(ctx) end
+        im.EndPopup(ctx)
+    end
+
+    -- ── Inline horizontal preset editor strip ────────────────────────────────
+    im.PushStyleColor(ctx, im.Col_ChildBg, 0x1A1A2AFF)
+    im.BeginChild(ctx, "##preset_strip_" .. bid, -1, 34, im.ChildFlags_Border)
+
+    local settings = core.settings.Load()
+    im.TextDisabled(ctx, "delim:")
+    im.SameLine(ctx, 0, 4)
+    im.TextColored(ctx, 0x888888FF, settings.delimiter)
+    im.SameLine(ctx, 0, 8)
+    im.TextDisabled(ctx, "|")
+    im.SameLine(ctx, 0, 8)
+
+    local swap_a, swap_b, remove_idx = nil, nil, nil
+    for i, s in ipairs(batch.sections) do
+        im.PushID(ctx, "strip_" .. i)
+
+        local badge_color = s.type == "shared" and 0x1A3A1AFF or 0x1A2A3AFF
+        local text_color  = s.type == "shared" and 0x88FF88FF or 0x88CCFFFF
+        im.PushStyleColor(ctx, im.Col_Button,        badge_color)
+        im.PushStyleColor(ctx, im.Col_ButtonHovered, badge_color + 0x00101000)
+        im.PushStyleColor(ctx, im.Col_Text,          text_color)
+        if im.SmallButton(ctx, s.type == "shared" and "S" or "I") then
+            s.type = s.type == "shared" and "input" or "shared"
+            if s.type == "input" then batch.shared_values[s.label] = nil end
+            sync_batch_groups(batch)
+        end
+        im.PopStyleColor(ctx, 3)
+        im.SameLine(ctx, 0, 3)
+
+        im.SetNextItemWidth(ctx, 70)
+        local buf_id = bid .. "strip_" .. i
+        local rv_l, val_l = im.InputText(ctx, "##lbl", get_buf(buf_id, s.label))
+        if rv_l then
+            local old_label = s.label
+            s.label = val_l
+            input_buffers[buf_id] = val_l
+            if batch.shared_values[old_label] ~= nil then
+                batch.shared_values[val_l] = batch.shared_values[old_label]
+                batch.shared_values[old_label] = nil
+            end
+            for _, g in ipairs(batch.groups) do
+                if g[old_label] ~= nil then
+                    g[val_l] = g[old_label]
+                    g[old_label] = nil
+                end
+            end
+        end
+        im.SameLine(ctx, 0, 2)
+
+        if i > 1 then
+            if im.SmallButton(ctx, "<") then swap_a, swap_b = i, i - 1 end
+        else
+            im.SmallButton(ctx, " ")
+        end
+        im.SameLine(ctx, 0, 1)
+        if i < #batch.sections then
+            if im.SmallButton(ctx, ">") then swap_a, swap_b = i, i + 1 end
+        else
+            im.SmallButton(ctx, " ")
+        end
+        im.SameLine(ctx, 0, 2)
+
+        im.PushStyleColor(ctx, im.Col_Text, 0xFF6666FF)
+        if im.SmallButton(ctx, "x") then remove_idx = i end
+        im.PopStyleColor(ctx)
+
+        if i < #batch.sections then
+            im.SameLine(ctx, 0, 4)
+            im.TextColored(ctx, 0x666666FF, settings.delimiter)
+            im.SameLine(ctx, 0, 4)
+        end
+
+        im.PopID(ctx)
+    end
+
+    if swap_a and swap_b then
+        batch.sections[swap_a], batch.sections[swap_b] = batch.sections[swap_b], batch.sections[swap_a]
+        local ba = bid .. "strip_" .. swap_a
+        local bb = bid .. "strip_" .. swap_b
+        input_buffers[ba], input_buffers[bb] = input_buffers[bb], input_buffers[ba]
+    end
+    if remove_idx then
+        table.remove(batch.sections, remove_idx)
+        for i2, s in ipairs(batch.sections) do
+            input_buffers[bid .. "strip_" .. i2] = s.label
+        end
+        sync_batch_groups(batch)
+    end
+
+    im.SameLine(ctx, 0, 10)
+    if im.SmallButton(ctx, "+ section") and #batch.sections < MAX_SECTIONS then
+        batch.sections[#batch.sections + 1] = { type = "input", label = "Name" }
+        input_buffers[bid .. "strip_" .. #batch.sections] = "Name"
+        sync_batch_groups(batch)
+    end
+
+    im.EndChild(ctx)
+    im.PopStyleColor(ctx)
 
     im.Spacing(ctx)
     im.Spacing(ctx)
@@ -876,9 +848,6 @@ local function Loop()
         im.End(ctx)
     end
 
-    -- Draw preset editor (separate window)
-    draw_preset_editor()
-    
     im.PopStyleVar(ctx, 6)
 
     if open then
