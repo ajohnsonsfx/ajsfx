@@ -80,6 +80,7 @@ local function create_batch_from_preset(preset)
     num_audio     = 4,
     num_midi      = 0,
     groups        = {},
+    layout_preview_open = true,
   }
   batch.groups[1] = {}
   for _, s in ipairs(batch.sections) do
@@ -551,48 +552,9 @@ local function draw_preset_layout(ctx, sections, delimiter)
     end
 end
 
-local function draw_batch_list()
-    im.BeginChild(ctx, "batch_list", 200, -50, 1)
-    im.SeparatorText(ctx, "Batches")
-
-    local remove_idx = nil
-    for i, b in ipairs(batches) do
-        local display = b.preset_name
-        if display == "" then display = "Batch " .. i end
-
-        im.PushID(ctx, i)
-        if im.Selectable(ctx, display, selected_batch == i) then
-            selected_batch = i
-        end
-        im.SameLine(ctx)
-        if im.SmallButton(ctx, "x") then
-            remove_idx = i
-        end
-        im.PopID(ctx)
-    end
-
-    if remove_idx then
-        table.remove(batches, remove_idx)
-        if selected_batch > #batches then selected_batch = #batches end
-        if selected_batch < 1 and #batches > 0 then selected_batch = 1 end
-    end
-
-    im.Spacing(ctx)
-    if im.Button(ctx, "+ Add Batch", -1, 0) then
-        local preset = all_presets[1] -- default to first preset
-        batches[#batches + 1] = create_batch_from_preset(preset)
-        selected_batch = #batches
-    end
-
-    im.EndChild(ctx)
-end
-
 local function draw_batch_config()
-    im.BeginChild(ctx, "batch_config", 0, -50, 1)
-
     if selected_batch < 1 or selected_batch > #batches then
         im.TextDisabled(ctx, "Select or add a batch to configure.")
-        im.EndChild(ctx)
         return
     end
 
@@ -840,8 +802,6 @@ local function draw_batch_config()
             im.TextDisabled(ctx, "... and " .. (batch.num_groups - 8) .. " more")
         end
     end
-
-    im.EndChild(ctx)
 end
 
 --------------------------------
@@ -864,25 +824,42 @@ local function Loop()
     local visible, open = im.Begin(ctx, "ajsfx Project Builder", true, WINDOW_FLAGS)
 
     if visible then
-        -- Two-column layout
-        draw_batch_list()
-        im.SameLine(ctx)
-        draw_batch_config()
+        -- Tab bar
+        if im.BeginTabBar(ctx, "##batches", im.TabBarFlags_None) then
+            for i, b in ipairs(batches) do
+                local tab_label = "Batch " .. i .. " \xc2\xb7 " .. (b.preset_name ~= "" and b.preset_name or "?") .. "##tab" .. i
+                local tab_flags = im.TabItemFlags_None
+                local visible_tab, p_tab_open = im.BeginTabItem(ctx, tab_label, true, tab_flags)
+                if not p_tab_open then
+                    -- User clicked × on this tab — remove the batch
+                    table.remove(batches, i)
+                    if selected_batch > #batches then selected_batch = #batches end
+                    if visible_tab then im.EndTabItem(ctx) end
+                    im.EndTabBar(ctx)
+                    goto continue_loop
+                end
+                if visible_tab then
+                    selected_batch = i
+                    draw_batch_config()
+                    im.EndTabItem(ctx)
+                end
+            end
+            -- Add Batch button as a non-closable tab
+            if im.TabItemButton(ctx, "\xe2\x9e\x95 Add Batch", im.TabItemFlags_Trailing) then
+                local preset = all_presets[1]
+                batches[#batches + 1] = create_batch_from_preset(preset)
+                selected_batch = #batches
+            end
+            im.EndTabBar(ctx)
+        end
 
-        -- Bottom buttons
+        -- Temporary buttons (will move to output panel in Task 9)
         im.Spacing(ctx)
         local avail_w = im.GetContentRegionAvail(ctx)
-
-        -- Right-align buttons
         local btn_w = 100
-        local spacing = 10
-        im.SetCursorPosX(ctx, im.GetCursorPosX(ctx) + avail_w - (btn_w * 2 + spacing))
-
-        if im.Button(ctx, "Cancel", btn_w, 0) then
-            open = false
-        end
+        im.SetCursorPosX(ctx, im.GetCursorPosX(ctx) + avail_w - (btn_w * 2 + 10))
+        if im.Button(ctx, "Cancel", btn_w, 0) then open = false end
         im.SameLine(ctx)
-
         local can_generate = #batches > 0
         if not can_generate then im.BeginDisabled(ctx) end
         if im.Button(ctx, "Generate", btn_w, 0) then
@@ -892,6 +869,8 @@ local function Loop()
             end
         end
         if not can_generate then im.EndDisabled(ctx) end
+
+        ::continue_loop::
         im.End(ctx)
     end
 
