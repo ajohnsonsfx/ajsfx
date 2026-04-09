@@ -4,3 +4,4 @@
 *.bak
 *.RPP-bak
 *.code-workspace
+.superpowers/

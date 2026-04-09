@@ -378,45 +378,8 @@ local function get_buf(id, default)
 end
 
 --------------------------------
--- --- GUI HELPERS ---
---------------------------------
-local function draw_labeled_input_text(ctx, label, buf_id, current_val, input_width, label_width)
-    im.Text(ctx, label)
-    im.SameLine(ctx, label_width)
-    im.SetNextItemWidth(ctx, input_width)
-    local rv, val = im.InputText(ctx, "##" .. buf_id, current_val)
-    return rv, val
-end
-
-local function draw_labeled_input_int(ctx, label, current_val, input_width, label_width, min_val, max_val)
-    im.Text(ctx, label)
-    im.SameLine(ctx, label_width)
-    im.SetNextItemWidth(ctx, input_width)
-    local rv, val = im.InputInt(ctx, "##" .. label, current_val, 1, 1)
-    if rv then
-        val = math.max(min_val, math.min(max_val, val))
-    end
-    return rv, val
-end
-
---------------------------------
 -- --- MAIN GUI ---
 --------------------------------
-local COLOR_SHARED = 0x88FF88FF -- Light Green
-local COLOR_INPUT = 0x88CCFFFF -- Light Blue
-local COLOR_DELIM = 0x888888FF -- Grey
-
-local function draw_preset_layout(ctx, sections, delimiter)
-    for i, s in ipairs(sections) do
-        local color = s.type == "shared" and COLOR_SHARED or COLOR_INPUT
-        im.TextColored(ctx, color, "[" .. s.label .. "]")
-        if i < #sections then
-            im.SameLine(ctx, 0, 0)
-            im.TextColored(ctx, COLOR_DELIM, delimiter)
-            im.SameLine(ctx, 0, 0)
-        end
-    end
-end
 
 local function draw_batch_config()
     if selected_batch < 1 or selected_batch > #batches then
@@ -1000,7 +963,7 @@ local function Loop()
     im.PushStyleVar(ctx, im.StyleVar_ItemSpacing, 8, 8)
     im.PushStyleVar(ctx, im.StyleVar_FramePadding, 6, 4)
 
-    im.SetNextWindowSize(ctx, 700, 500, im.Cond_FirstUseEver)
+    im.SetNextWindowSize(ctx, 860, 540, im.Cond_FirstUseEver)
     local visible, open = im.Begin(ctx, "ajsfx Project Builder", true, WINDOW_FLAGS)
 
     if visible then
