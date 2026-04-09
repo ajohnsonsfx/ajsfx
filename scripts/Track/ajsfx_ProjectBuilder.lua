@@ -29,6 +29,14 @@ end
 --------------------------------
 local EXT_SECTION     = "ajsfx_ProjectBuilder"
 local PRESETS_SECTION = "ajsfx_ProjectBuilder_Presets"
+local BUILTIN_WILDCARDS = {
+    "$monthname","$computer","$project","$author","$minute",
+    "$hour12","$year2","$month","$year","$hour","$user","$day"
+}
+local function is_builtin_wildcard(name)
+    for _, b in ipairs(BUILTIN_WILDCARDS) do if b == name then return true end end
+    return false
+end
 local MAX_GROUPS      = 64
 local MAX_AUX         = 8
 local MAX_CONTENT     = 64
@@ -842,7 +850,8 @@ local function draw_settings_window()
         true, im.WindowFlags_AlwaysAutoResize)
 
     if not p_open then
-        settings_open = false
+        settings_open  = false
+        settings_state = core.settings.Load()  -- discard unsaved edits
         if vis then im.End(ctx) end
         return
     end
@@ -940,18 +949,10 @@ local function draw_settings_window()
         input_buffers["st_new_wp"] = val_np
     end
     im.SameLine(ctx)
-    local BUILTIN_WILDCARDS = {
-        "$monthname","$computer","$project","$author","$minute",
-        "$hour12","$year2","$month","$year","$hour","$user","$day"
-    }
-    local function is_builtin(name)
-        for _, b in ipairs(BUILTIN_WILDCARDS) do if b == name then return true end end
-        return false
-    end
     local can_add = settings_new_wc_name:sub(1, 1) == "$"
         and settings_new_wc_name ~= ""
         and settings_new_wc_pattern ~= ""
-        and not is_builtin(settings_new_wc_name)
+        and not is_builtin_wildcard(settings_new_wc_name)
     if not can_add then im.BeginDisabled(ctx) end
     if im.Button(ctx, "+ Add") then
         settings_state.custom_wildcards[#settings_state.custom_wildcards + 1] = {
@@ -1089,7 +1090,12 @@ local function Loop()
         end
 
         if im.Button(ctx, "\xe2\x9a\x99 Settings", -1, 0) then
-            settings_open = true
+            settings_open           = true
+            settings_state          = core.settings.Load()
+            settings_new_wc_name    = ""
+            settings_new_wc_pattern = ""
+            input_buffers["st_new_wn"] = ""
+            input_buffers["st_new_wp"] = ""
         end
         im.Spacing(ctx)
 
@@ -1105,9 +1111,8 @@ local function Loop()
 
         im.EndChild(ctx)
         im.PopStyleColor(ctx)
-
-        im.End(ctx)
     end
+    im.End(ctx)
 
     draw_settings_window()
     im.PopStyleVar(ctx, 6)
