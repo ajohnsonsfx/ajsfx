@@ -56,40 +56,6 @@ local status_msg = ""
 -- Helpers
 -- -----------------------------------------------------------------------
 
--- Exact filenames that pvx scratch produces — never wildcard-delete.
-local SCRATCH_FILES = {
-  "pvx_run.bat", "pvx_launch.vbs",
-  "pvx_out.wav", "preview_pvx_out.wav",
-  "pitch.csv", "stretch.csv",
-  "preview_pitch.csv", "preview_stretch.csv",
-  "log.txt", "done.txt", "pid.txt",
-}
-
-local function ClearScratch()
-  local scratch = pvx_lib.ResolveScratchDir(cfg)
-  if scratch == "" then
-    status_msg = "Scratch dir not set."
-    return
-  end
-
-  -- Confirm before deleting anything
-  local confirm = r.ShowMessageBox(
-    "Delete pvx temp files from:\n" .. scratch ..
-    "\n\nOnly known pvx filenames are removed (no wildcard delete).",
-    "Clear Scratch", 1)  -- 1 = OK / Cancel
-  if confirm ~= 1 then return end
-
-  local removed = 0
-  for _, name in ipairs(SCRATCH_FILES) do
-    local path = scratch .. "/" .. name
-    if os.remove(path) then
-      removed = removed + 1
-    end
-  end
-
-  status_msg = string.format("Cleared %d file(s) from scratch.", removed)
-end
-
 local function CheckPVXVersion()
   local bin = cfg.pvx_binary or "pvx"
   local tmp_out = os.tmpname() .. "_pvx_ver.txt"
@@ -216,11 +182,6 @@ local function loop()
       pvx_lib.SaveConfig(cfg)
       status_msg = "Reset to defaults."
     end
-    im.SameLine(ctx)
-    if im.Button(ctx, "Clear Scratch") then
-      ClearScratch()
-    end
-
     if status_msg ~= "" then
       im.Spacing(ctx)
       im.Text(ctx, status_msg)
