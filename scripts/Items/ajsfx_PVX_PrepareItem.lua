@@ -107,7 +107,7 @@ if already_has_host then
 end
 
 if not host_fx_idx then
-  local added_idx = r.TakeFX_AddByName(take, "ajsfx PVX Host", false, -1)
+  local added_idx = r.TakeFX_AddByName(take, "ajsfx PVX Host", 0, -1)  -- 0 = normal FX chain (not recFX)
   if added_idx < 0 then
     core.Error("Could not add 'ajsfx PVX Host' to the take FX chain.\n" ..
                "Make sure the JSFX is installed in your REAPER Effects folder.\n" ..
