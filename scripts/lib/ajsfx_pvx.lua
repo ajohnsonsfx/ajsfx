@@ -22,14 +22,15 @@ function pvx.Log2StretchToFactor(v)
   return factor
 end
 
--- Format a samples table as a two-column CSV string: "time,value\n..."
--- samples: array of {t, v} pairs; rate_hz: sample rate used when building
--- Returns the full CSV string including a header-free body.
+-- Format a samples table as a CSV string for pvx.
+-- Includes the required "time,value" header row (pvx uses csv.DictReader).
+-- samples: array of {t_seconds, v} pairs
+-- Returns: CSV string with header, or "" for empty samples.
 function pvx.FormatCSV(samples, rate_hz)
-  local lines = {}
-  local inv = 1.0 / rate_hz
-  for i, pair in ipairs(samples) do
-    lines[i] = string.format("%.6f,%.6f", pair[1], pair[2])
+  if #samples == 0 then return "" end
+  local lines = { "time,value" }
+  for _, pair in ipairs(samples) do
+    lines[#lines + 1] = string.format("%.6f,%.6f", pair[1], pair[2])
   end
   return table.concat(lines, "\n")
 end
@@ -45,30 +46,24 @@ function pvx.ShouldEmitCurve(has_envelope, slider_value, default_value)
 end
 
 -- Build the pvx argv table from a config table.
+-- CLI: pvx voc <input> [--pitch CSV] [--stretch CSV] [--interp MODE] --output <output>
 -- config fields:
---   input         (string)  — path to input WAV
---   output        (string)  — path to output WAV
---   pitch_csv     (string|nil) — path to pitch CSV (omit flag if nil)
---   stretch_csv   (string|nil) — path to stretch CSV (omit flag if nil)
---   interp        (number)  — slider3 value: 0=linear,1=cubic,2=sinc
---   phase_lock    (number)  — slider4 value: 0=off,1=loose,2=strict
---   preserve_trans(number)  — slider5 value: 0=off,1=on
--- Returns: array of strings (argv, NOT pre-joined)
+--   input         (string)     — path to input WAV
+--   output        (string)     — path to output WAV
+--   pitch_csv     (string|nil) — path to pitch CSV; omitted if nil
+--   stretch_csv   (string|nil) — path to stretch CSV; omitted if nil
+--   interp        (number)     — 0=linear, 1=cubic, 2=polynomial
+-- Returns: array of strings (argv, NOT pre-joined; argv[1] is "pvx" placeholder)
 function pvx.BuildArgv(config)
-  local interp_names  = { [0]="linear", [1]="cubic",  [2]="sinc"   }
-  local phase_names   = { [0]="off",    [1]="loose",  [2]="strict" }
+  local interp_names = { [0]="linear", [1]="cubic", [2]="polynomial" }
 
   local argv = {
-    "pvx",
+    "pvx",   -- placeholder; caller replaces with real binary path
+    "voc",
     config.input,
-    config.output,
-    "--interp",     interp_names[config.interp]     or "linear",
-    "--phase-lock", phase_names[config.phase_lock]  or "loose",
+    "--output", config.output,
+    "--interp", interp_names[config.interp] or "linear",
   }
-
-  if config.preserve_trans == 1 then
-    argv[#argv + 1] = "--preserve-transients"
-  end
 
   if config.pitch_csv then
     argv[#argv + 1] = "--pitch"
@@ -267,6 +262,7 @@ function pvx.RunPVXAsync(argv, scratch_dir, on_done, on_cancel, on_error, poll_r
     end
     fb:write("@echo off\r\n")
     fb:write("set HOME=%USERPROFILE%\r\n")
+    fb:write("set PWD=%CD%\r\n")
     fb:write(cmd_str .. ' > "' .. log_win .. '" 2>&1\r\n')
     fb:write('echo %ERRORLEVEL% > "' .. done_win .. '"\r\n')
     fb:close()
@@ -331,6 +327,24 @@ function pvx.RunPVXAsync(argv, scratch_dir, on_done, on_cancel, on_error, poll_r
   local ctx        = im.CreateContext('PVX Render')
   local start_time = r.time_precise()
   local cancelled  = false
+  local log_lines  = {}  -- last N lines read from log.txt
+
+  -- Read the tail of the log file into log_lines (at most max_lines).
+  local function UpdateLogLines(max_lines)
+    local lf = io.open(log_file, "r")
+    if not lf then return end
+    local buf = {}
+    for line in lf:lines() do
+      buf[#buf + 1] = line
+      -- Keep buffer bounded so large logs don't accumulate in memory
+      if #buf > max_lines * 3 then table.remove(buf, 1) end
+    end
+    lf:close()
+    log_lines = {}
+    for i = math.max(1, #buf - max_lines + 1), #buf do
+      log_lines[#log_lines + 1] = buf[i]
+    end
+  end
 
   local function cancel_process()
     if is_win then
@@ -375,35 +389,56 @@ function pvx.RunPVXAsync(argv, scratch_dir, on_done, on_cancel, on_error, poll_r
       local lf = io.open(log_file, "r")
       local log_txt = lf and lf:read("*a") or ""
       if lf then lf:close() end
-      -- Don't call im.DestroyContext — not exposed by the imgui wrapper;
-      -- the context is cleaned up automatically when the script ends.
+      -- Contexts are managed by REAPER; no DestroyContext needed.
       ctx = nil
       on_done(code, log_txt)
       return
     end
+
+    -- Update log display (read last 6 lines of pvx output)
+    UpdateLogLines(6)
 
     -- Draw progress window
     if not (ctx and im.ValidatePtr(ctx, 'ImGui_Context*')) then
       ctx = im.CreateContext('PVX Render')
     end
 
-    im.SetNextWindowSize(ctx, 300, 80, im.Cond_FirstUseEver)
-    local visible, open = im.Begin(ctx, 'PVX Render', true,
-      im.WindowFlags_NoResize + im.WindowFlags_NoCollapse)
+    im.SetNextWindowSize(ctx, 500, 200, im.Cond_FirstUseEver)
+    local visible, open = im.Begin(ctx, 'ajsfx PVX Render', true,
+      im.WindowFlags_NoCollapse)
 
     if visible then
       im.Text(ctx, spin_chars[spin_idx] .. "  Running pvx...  " ..
-        string.format("%.0fs", elapsed))
+        string.format("%.0fs / %ds", elapsed, timeout_s))
       im.Spacing(ctx)
-      if im.Button(ctx, "Cancel") or not open then
+      im.Separator(ctx)
+      im.Spacing(ctx)
+      -- Stream log output — shows pvx progress bar and stage names
+      if #log_lines == 0 then
+        im.TextDisabled(ctx, "(waiting for pvx output...)")
+      else
+        for _, line in ipairs(log_lines) do
+          im.TextUnformatted(ctx, line)
+        end
+      end
+      im.Spacing(ctx)
+      im.Separator(ctx)
+      im.Spacing(ctx)
+      if im.Button(ctx, "Cancel") then
+        im.End(ctx)  -- End before early return
         cancel_process()
-        im.End(ctx)
         ctx = nil
         on_cancel()
         return
       end
-      im.End(ctx)
-    elseif not open then
+    end
+
+    -- Always call End after Begin — skipping it corrupts ImGui's push/pop
+    -- stack and can cause spurious open=false returns in subsequent frames.
+    im.End(ctx)
+
+    -- Check close button AFTER End (safe to act on after stack is balanced)
+    if not open then
       cancel_process()
       ctx = nil
       on_cancel()
@@ -465,6 +500,201 @@ function pvx.ResolveScratchDir(config)
   -- os.tmpname returns a file path; get its directory
   local dir = tmp:match("(.*[/\\])")
   return (dir or "/tmp") .. "pvx_scratch"
+end
+
+--------------------------------
+-- Installation helpers
+--------------------------------
+
+-- Expected pvx binary path in the shared ajsfx-Scripts venv.
+function pvx.GetDefaultVenvBin()
+  local is_win = r.GetOS():find("Win") ~= nil
+  local base   = r.GetResourcePath():gsub("\\", "/") .. "/Scripts/ajsfx-Scripts/venv"
+  if is_win then
+    return (base .. "/Scripts/pvx.exe"):gsub("/", "\\")
+  else
+    return base .. "/bin/pvx"
+  end
+end
+
+-- Resolve the pvx binary path to use for a subprocess launch.
+-- Prefers cfg.pvx_binary if it exists on disk; otherwise falls back to the
+-- default ajsfx-Scripts venv binary if that exists. Returns nil if neither
+-- path resolves to an actual file. Single source of truth — IsPVXReady and
+-- every argv builder should call this so they can't disagree.
+function pvx.GetPVXBinary(cfg)
+  local bin = cfg and cfg.pvx_binary or ""
+  if bin ~= "" and bin ~= "pvx" then
+    local f = io.open(bin, "r")
+    if f then f:close(); return bin end
+  end
+  local def = pvx.GetDefaultVenvBin()
+  local f2 = io.open(def, "r")
+  if f2 then f2:close(); return def end
+  return nil
+end
+
+-- Returns true if pvx is installed and the binary can be found.
+function pvx.IsPVXReady(cfg)
+  return pvx.GetPVXBinary(cfg) ~= nil
+end
+
+-- Module-local: find a Python 3 interpreter on PATH.
+local function FindPython()
+  local is_win = r.GetOS():find("Win") ~= nil
+  local candidates = is_win and { "python", "py", "python3" }
+                              or { "python3", "python" }
+  for _, cmd in ipairs(candidates) do
+    local f = io.popen(cmd .. ' --version 2>&1')
+    if f then
+      local out = f:read("*l") or ""
+      f:close()
+      if out:find("Python 3") then return cmd end
+    end
+  end
+  return nil
+end
+
+-- Async pvx installer.  Opens a visible terminal window showing pip progress.
+-- on_done(pvx_bin_path) : called when install completes; binary path is saved to ExtState.
+-- on_error(msg)         : called on failure.
+function pvx.RunInstallAsync(on_done, on_error)
+  local is_win     = r.GetOS():find("Win") ~= nil
+  local res_base   = r.GetResourcePath():gsub("\\", "/")
+  local scripts_dir = res_base .. "/Scripts/ajsfx-Scripts"
+  local venv_path   = scripts_dir .. "/venv"
+  local pip_path    = venv_path .. (is_win and "/Scripts/pip.exe" or "/bin/pip")
+  local pvx_bin     = venv_path .. (is_win and "/Scripts/pvx.exe" or "/bin/pvx")
+  local done_file   = scripts_dir .. "/install_done.txt"
+  local zip_url     = "https://github.com/TheColby/pvx/archive/refs/heads/main.zip"
+
+  local python_cmd = FindPython()
+  if not python_cmd then
+    on_error("Python 3 not found on PATH.\n" ..
+             "Install Python 3.8+ from https://python.org and ensure it is on your PATH.")
+    return
+  end
+
+  local function native(p) return is_win and p:gsub("/", "\\") or p end
+
+  -- Ensure scripts_dir exists before writing the launcher script there
+  if is_win then
+    os.execute('mkdir "' .. native(scripts_dir) .. '" 2>NUL')
+  else
+    os.execute("mkdir -p '" .. scripts_dir .. "'")
+  end
+
+  os.remove(done_file)  -- clear any stale sentinel
+
+  if is_win then
+    local bat      = scripts_dir .. "/pvx_install.bat"
+    local bat_win  = native(bat)
+    local pip_win  = native(pip_path)
+    local venv_win = native(venv_path)
+    local done_win = native(done_file)
+
+    local fb = io.open(bat, "w")
+    if not fb then on_error("Cannot write installer bat: " .. bat); return end
+
+    fb:write("@echo off\r\n")
+    fb:write("title ajsfx PVX Install\r\n")
+    fb:write("set HOME=%USERPROFILE%\r\n")
+    fb:write("set PWD=%CD%\r\n")
+    fb:write("echo === ajsfx PVX Install ===\r\n")
+    fb:write("echo Python: " .. python_cmd .. "\r\n")
+    fb:write("echo Venv:   " .. venv_win .. "\r\n")
+    fb:write("echo.\r\n")
+    -- Create venv if pip.exe not yet present
+    fb:write('if not exist "' .. pip_win .. '" (\r\n')
+    fb:write("  echo Creating Python virtual environment...\r\n")
+    fb:write("  " .. python_cmd .. ' -m venv "' .. venv_win .. '"\r\n')
+    fb:write("  if errorlevel 1 (\r\n")
+    fb:write("    echo ERROR: Failed to create venv!\r\n")
+    fb:write("    set INSTALL_CODE=1\r\n")
+    fb:write("    goto :write_done\r\n")
+    fb:write("  )\r\n")
+    fb:write("  echo.\r\n")
+    fb:write(")\r\n")
+    fb:write("echo Upgrading pip...\r\n")
+    fb:write('"' .. pip_win .. '" install --upgrade pip\r\n')
+    fb:write("echo.\r\n")
+    fb:write("echo Installing pvx from GitHub...\r\n")
+    fb:write("echo (This may take a minute)\r\n")
+    fb:write('"' .. pip_win .. '" install ' .. zip_url .. '\r\n')
+    fb:write("set INSTALL_CODE=%ERRORLEVEL%\r\n")
+    fb:write("echo.\r\n")
+    fb:write("if %INSTALL_CODE% EQU 0 (\r\n")
+    fb:write("  echo pvx installed successfully!\r\n")
+    fb:write(") else (\r\n")
+    fb:write("  echo ERROR: Installation failed! See above for details.\r\n")
+    fb:write(")\r\n")
+    fb:write(":write_done\r\n")
+    fb:write('echo %INSTALL_CODE% > "' .. done_win .. '"\r\n')
+    fb:write("echo.\r\n")
+    fb:write("echo You can close this window.\r\n")
+    fb:close()
+
+    -- Launch visible cmd window (/k keeps it open so user can read output)
+    local ok = os.execute('start "ajsfx PVX Install" cmd /k "' .. bat_win .. '"')
+    if not ok then on_error("Failed to launch installer window."); return end
+  else
+    local sh = scripts_dir .. "/pvx_install.sh"
+    local sf = io.open(sh, "w")
+    if not sf then on_error("Cannot write installer script: " .. sh); return end
+    sf:write("#!/bin/bash\n")
+    sf:write("echo '=== ajsfx PVX Install ==='\n")
+    sf:write("echo 'Python: " .. python_cmd .. "'\n")
+    sf:write("mkdir -p '" .. scripts_dir .. "'\n")
+    sf:write("if [ ! -f '" .. pip_path .. "' ]; then\n")
+    sf:write("  echo 'Creating venv...'\n")
+    sf:write("  " .. python_cmd .. " -m venv '" .. venv_path .. "'\n")
+    sf:write("  [ $? -ne 0 ] && { echo 'ERROR: venv failed!'; echo 1 > '" .. done_file .. "'; exit 1; }\n")
+    sf:write("fi\n")
+    sf:write("echo 'Upgrading pip...'\n")
+    sf:write("'" .. pip_path .. "' install --upgrade pip\n")
+    sf:write("echo 'Installing pvx from GitHub...'\n")
+    sf:write("'" .. pip_path .. "' install " .. zip_url .. "\n")
+    sf:write("echo $? > '" .. done_file .. "'\n")
+    sf:write("[ $? -eq 0 ] && echo 'pvx installed successfully!' || echo 'ERROR: Installation failed!'\n")
+    sf:write("echo 'Press enter to close.'; read\n")
+    sf:close()
+    os.execute("chmod +x '" .. sh .. "'")
+    local ok = os.execute("open -a Terminal '" .. sh .. "' 2>/dev/null") or
+               os.execute("x-terminal-emulator -e 'bash " .. sh .. "' 2>/dev/null") or
+               os.execute("xterm -e 'bash " .. sh .. "' 2>/dev/null")
+    if not ok then
+      on_error("Could not open a terminal. Run the installer manually:\n" .. sh)
+      return
+    end
+  end
+
+  -- Poll for done file; no progress UI needed since the installer window is visible
+  local start_time = r.time_precise()
+  local timeout    = 600  -- 10 minutes
+
+  local function poll()
+    local f = io.open(done_file, "r")
+    if f then
+      local code = tonumber((f:read("*l") or "1"):match("%d+")) or 1
+      f:close()
+      os.remove(done_file)
+      if code == 0 then
+        local bin = is_win and native(pvx_bin) or pvx_bin
+        r.SetExtState("ajsfx_pvx", "pvx_binary", bin, true)
+        on_done(bin)
+      else
+        on_error("pvx installation failed. Check the installer window for details.")
+      end
+      return
+    end
+    if r.time_precise() - start_time > timeout then
+      on_error("Installation timed out after " .. timeout .. " seconds.")
+      return
+    end
+    r.defer(poll)
+  end
+
+  r.defer(poll)
 end
 
 return pvx

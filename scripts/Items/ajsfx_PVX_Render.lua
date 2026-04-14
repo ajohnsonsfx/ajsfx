@@ -269,7 +269,27 @@ end
 local item, take, host_fx = ValidateSelection()
 if not item then return end
 
-local config     = pvx.LoadConfig()
+local config = pvx.LoadConfig()
+
+if not pvx.IsPVXReady(config) then
+  local ok = r.ShowMessageBox(
+    "pvx is not installed.\n\n" ..
+    "Install it now? This will open an installer window and requires an internet connection.\n\n" ..
+    "After installation completes, re-run this render script.",
+    "pvx required", 1)
+  if ok == 1 then
+    pvx.RunInstallAsync(
+      function(pvx_bin)
+        config.pvx_binary = pvx_bin
+        r.MB("pvx installed!\n\nRe-run ajsfx PVX Render to process your item.",
+             "pvx installed", 0)
+      end,
+      function(err) core.Error("pvx installation failed:\n" .. err) end
+    )
+  end
+  return
+end
+
 local scratch    = pvx.ResolveScratchDir(config)
 EnsureDir(scratch)
 

@@ -56,20 +56,25 @@ end)
 -- --- FormatCSV ---
 print("\nFormatCSV:")
 
-test("single sample formats correctly", function()
+test("single sample has header then data row", function()
   local samples = { {0.0, 1.5} }
   local csv = pvx.FormatCSV(samples, 50)
-  assert(csv == "0.000000,1.500000", "Got: " .. csv)
+  local lines = {}
+  for line in csv:gmatch("[^\n]+") do lines[#lines + 1] = line end
+  assert(#lines == 2, "Expected 2 lines (header + 1 data), got " .. #lines)
+  assert(lines[1] == "time,value", "Header: " .. lines[1])
+  assert(lines[2] == "0.000000,1.500000", "Data: " .. lines[2])
 end)
 
-test("two samples separated by newline", function()
+test("two samples: header + two data rows", function()
   local samples = { {0.0, 0.0}, {1.0, 12.0} }
   local csv = pvx.FormatCSV(samples, 50)
   local lines = {}
   for line in csv:gmatch("[^\n]+") do lines[#lines + 1] = line end
-  assert(#lines == 2, "Expected 2 lines, got " .. #lines)
-  assert(lines[1] == "0.000000,0.000000", "Line 1: " .. lines[1])
-  assert(lines[2] == "1.000000,12.000000", "Line 2: " .. lines[2])
+  assert(#lines == 3, "Expected 3 lines, got " .. #lines)
+  assert(lines[1] == "time,value",          "Header: "  .. lines[1])
+  assert(lines[2] == "0.000000,0.000000",   "Line 2: "  .. lines[2])
+  assert(lines[3] == "1.000000,12.000000",  "Line 3: "  .. lines[3])
 end)
 
 test("empty samples returns empty string", function()
@@ -99,35 +104,35 @@ end)
 -- --- BuildArgv ---
 print("\nBuildArgv:")
 
-test("basic config produces correct argv", function()
-  local cfg = {
-    input  = "/tmp/in.wav",
-    output = "/tmp/out.wav",
-    interp = 0,         -- linear
-    phase_lock = 1,     -- loose
-    preserve_trans = 0,
-  }
+test("basic config: pvx placeholder, voc subcommand, --output, --interp", function()
+  local cfg = { input = "/tmp/in.wav", output = "/tmp/out.wav", interp = 0 }
   local argv = pvx.BuildArgv(cfg)
-  assert(argv[1] == "pvx")
-  assert(argv[2] == "/tmp/in.wav")
-  assert(argv[3] == "/tmp/out.wav")
+  assert(argv[1] == "pvx",          "argv[1] should be pvx placeholder, got: " .. tostring(argv[1]))
+  assert(argv[2] == "voc",          "argv[2] should be voc subcommand, got: "  .. tostring(argv[2]))
+  assert(argv[3] == "/tmp/in.wav",  "argv[3] should be input path")
 
+  local has_output = false
   local has_interp = false
-  local has_phase  = false
   for i, v in ipairs(argv) do
-    if v == "--interp"     then has_interp = true; assert(argv[i+1] == "linear") end
-    if v == "--phase-lock" then has_phase  = true; assert(argv[i+1] == "loose")  end
+    if v == "--output" then has_output = true; assert(argv[i+1] == "/tmp/out.wav") end
+    if v == "--interp" then has_interp = true; assert(argv[i+1] == "linear")       end
   end
+  assert(has_output, "Missing --output flag")
   assert(has_interp, "Missing --interp flag")
-  assert(has_phase,  "Missing --phase-lock flag")
+end)
+
+test("no --phase-lock or --preserve-transients in argv", function()
+  local cfg = { input = "in.wav", output = "out.wav", interp = 0 }
+  local argv = pvx.BuildArgv(cfg)
+  for _, v in ipairs(argv) do
+    assert(v ~= "--phase-lock",          "--phase-lock should not appear")
+    assert(v ~= "--preserve-transients", "--preserve-transients should not appear")
+  end
 end)
 
 test("pitch_csv adds --pitch flag", function()
-  local cfg = {
-    input = "in.wav", output = "out.wav",
-    interp = 0, phase_lock = 0, preserve_trans = 0,
-    pitch_csv = "/tmp/pitch.csv",
-  }
+  local cfg = { input = "in.wav", output = "out.wav", interp = 0,
+                pitch_csv = "/tmp/pitch.csv" }
   local argv = pvx.BuildArgv(cfg)
   local found = false
   for i, v in ipairs(argv) do
@@ -137,11 +142,8 @@ test("pitch_csv adds --pitch flag", function()
 end)
 
 test("stretch_csv adds --stretch flag", function()
-  local cfg = {
-    input = "in.wav", output = "out.wav",
-    interp = 0, phase_lock = 0, preserve_trans = 0,
-    stretch_csv = "/tmp/stretch.csv",
-  }
+  local cfg = { input = "in.wav", output = "out.wav", interp = 0,
+                stretch_csv = "/tmp/stretch.csv" }
   local argv = pvx.BuildArgv(cfg)
   local found = false
   for i, v in ipairs(argv) do
@@ -150,29 +152,13 @@ test("stretch_csv adds --stretch flag", function()
   assert(found, "--stretch flag not found")
 end)
 
-test("no pitch/stretch csv when omitted", function()
-  local cfg = {
-    input = "in.wav", output = "out.wav",
-    interp = 0, phase_lock = 0, preserve_trans = 0,
-  }
+test("no pitch/stretch flags when csvs omitted", function()
+  local cfg = { input = "in.wav", output = "out.wav", interp = 0 }
   local argv = pvx.BuildArgv(cfg)
   for _, v in ipairs(argv) do
     assert(v ~= "--pitch",   "--pitch should not appear")
     assert(v ~= "--stretch", "--stretch should not appear")
   end
-end)
-
-test("preserve_trans=1 adds --preserve-transients", function()
-  local cfg = {
-    input = "in.wav", output = "out.wav",
-    interp = 0, phase_lock = 0, preserve_trans = 1,
-  }
-  local argv = pvx.BuildArgv(cfg)
-  local found = false
-  for _, v in ipairs(argv) do
-    if v == "--preserve-transients" then found = true end
-  end
-  assert(found, "--preserve-transients not found")
 end)
 
 -- --- QuoteArg ---
