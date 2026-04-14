@@ -234,34 +234,36 @@ function pvx.RunPVXAsync(argv, scratch_dir, on_done, on_cancel, on_error, poll_r
   end
   local cmd_str = table.concat(quoted, " ")
 
+  -- Extract just the executable name for taskkill (Windows cancel)
+  local pvx_exe_name = (argv[1]:match("[/\\]([^/\\]+)$") or argv[1])
+  if not pvx_exe_name:lower():find("%.exe$") then
+    pvx_exe_name = pvx_exe_name .. ".exe"
+  end
+
   local launch_ok
   if is_win then
-    -- Windows: PowerShell wrapper to capture PID and exit code
-    local bat = scratch_dir .. "/pvx_run.bat"
-    local bat_content = string.format(
-      '@echo off\r\n' ..
-      'start /B "" %s > %s 2>&1\r\n' ..
-      'echo %%ERRORLEVEL%% > %s\r\n',
-      cmd_str,
-      pvx.QuoteArg(log_file, "Windows"),
-      pvx.QuoteArg(done_file, "Windows")
-    )
-    -- Write bat wrapper
+    -- Windows: write a bat that runs pvx SYNCHRONOUSLY (no inner start /B).
+    -- The bat itself is launched as the background process, so it blocks waiting
+    -- for pvx to finish, then writes the real exit code to done.txt.
+    local bat     = scratch_dir .. "/pvx_run.bat"
+    local log_win  = log_file:gsub("/", "\\")
+    local done_win = done_file:gsub("/", "\\")
+    local bat_win  = bat:gsub("/", "\\")
+
     local f = io.open(bat, "w")
     if not f then
       on_error("Cannot write launcher batch file: " .. bat)
       return
     end
-    f:write(bat_content)
+    -- pvx runs directly (blocking from the bat's perspective)
+    f:write("@echo off\r\n")
+    f:write(cmd_str .. ' > "' .. log_win .. '" 2>&1\r\n')
+    f:write('echo %ERRORLEVEL% > "' .. done_win .. '"\r\n')
     f:close()
 
-    -- Use PowerShell to launch + capture PID
-    local ps_cmd = string.format(
-      'powershell -Command "$p = Start-Process -FilePath %s -PassThru -NoNewWindow; $p.Id | Out-File -Encoding ASCII %s"',
-      pvx.QuoteArg(bat, "Windows"),
-      pvx.QuoteArg(pid_file, "Windows")
-    )
-    launch_ok = os.execute(ps_cmd)
+    -- Launch the bat detached: cmd /c start "" /B returns immediately while
+    -- the bat keeps running pvx in the background.
+    launch_ok = os.execute('cmd /c start "" /B "' .. bat_win .. '"')
   else
     -- Unix: subshell captures PID and writes done sentinel
     local shell_cmd = string.format(
@@ -310,14 +312,16 @@ function pvx.RunPVXAsync(argv, scratch_dir, on_done, on_cancel, on_error, poll_r
   local cancelled  = false
 
   local function cancel_process()
-    local pf = io.open(pid_file, "r")
-    if pf then
-      local pid = pf:read("*l")
-      pf:close()
-      if pid and pid ~= "" then
-        if is_win then
-          os.execute("taskkill /F /PID " .. pid .. " > NUL 2>&1")
-        else
+    if is_win then
+      -- Windows v1: kill by executable name (no reliable PID from cmd /c start)
+      os.execute('taskkill /F /IM "' .. pvx_exe_name .. '" > NUL 2>&1')
+    else
+      -- Unix: use the PID written by the subshell
+      local pf = io.open(pid_file, "r")
+      if pf then
+        local pid = pf:read("*l")
+        pf:close()
+        if pid and pid ~= "" then
           os.execute("kill -9 " .. pid .. " 2>/dev/null")
         end
       end
