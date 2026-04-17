@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="ajsfx" commit="3e3c2e011877e4db8132c68d3adaf452e1ba9f0f">
+<index version="1" name="ajsfx" commit="5d2bb76005a4acf522785174176ae2d286063e21">
   <category name="scripts/FX">
     <reapack name="ajsfx_PVXHost.jsfx" type="effect" desc="ajsfx PVX Host">
       <metadata>
@@ -32,6 +32,26 @@
         <source file="../lib/ajsfx_core.lua">https://github.com/ajohnsonsfx/ajsfx/raw/498764ffcf155342c7f89e7416587c6bf89edd72/scripts/lib/ajsfx_core.lua</source>
       </version>
     </reapack>
+    <reapack name="ajsfx_MediaItemCounter.lua" type="script" desc="Simple Item Counter">
+      <version name="1.3" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <changelog><![CDATA[Moved settings to a separate script]]></changelog>
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Items/ajsfx_MediaItemCounter.lua</source>
+      </version>
+    </reapack>
+    <reapack name="ajsfx_MediaItemCounter_Settings.lua" type="script" desc="Media Item Counter Settings">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Settings panel for ajsfx_MediaItemCounter\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.3" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Items/ajsfx_MediaItemCounter_Settings.lua</source>
+      </version>
+    </reapack>
     <reapack name="ajsfx_PVX_Install.lua" type="script" desc="ajsfx PVX Install">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
@@ -48,6 +68,176 @@
       <version name="0.2" author="ajsfx" time="2026-04-14T22:03:25Z">
         <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/f2596dffbef9901fa753a0df201198bf155ca4b6/scripts/Items/ajsfx_PVX_Install.lua</source>
         <source file="../lib/ajsfx_pvx.lua">https://github.com/ajohnsonsfx/ajsfx/raw/f2596dffbef9901fa753a0df201198bf155ca4b6/scripts/lib/ajsfx_pvx.lua</source>
+      </version>
+    </reapack>
+    <reapack name="ajsfx_PVX_PrepareItem.lua" type="script" desc="ajsfx PVX PrepareItem">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Prepares any selected item for PVX processing: MIDI/empty \u8594 ? renders to audio first (action 41999), then adds PVX Host. Existing audio take \u8594 ? adds PVX Host directly (no re-render needed). Also creates and shows the Pitch and Stretch envelope lanes automatically.\par}
+}
+]]></description>
+      </metadata>
+      <version name="0.2" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Items/ajsfx_PVX_PrepareItem.lua</source>
+      </version>
+    </reapack>
+    <reapack name="ajsfx_PVX_Preview.lua" type="script" desc="ajsfx PVX Preview">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Previews the pvx-processed output for the selected audio item without mutating the project. Uses a time selection if present, otherwise previews N seconds around the edit cursor. Requires SWS extension for playback.\par}
+}
+]]></description>
+      </metadata>
+      <version name="0.1" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Items/ajsfx_PVX_Preview.lua</source>
+      </version>
+    </reapack>
+    <reapack name="ajsfx_PVX_Render.lua" type="script" desc="ajsfx PVX Render">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Applies time-varying pitch/stretch to the selected audio item via pvx. Renders a new take on the source item. Requires ajsfx PVX Host on the take FX chain.\par}
+}
+]]></description>
+      </metadata>
+      <version name="0.1" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Items/ajsfx_PVX_Render.lua</source>
+      </version>
+    </reapack>
+    <reapack name="ajsfx_PVX_Settings.lua" type="script" desc="ajsfx PVX Settings">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Settings panel for ajsfx PVX Render/Preview. Configure the pvx binary path, scratch directory, poll rate, preview duration, and render timeout.\par}
+}
+]]></description>
+      </metadata>
+      <version name="0.1" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Items/ajsfx_PVX_Settings.lua</source>
+      </version>
+    </reapack>
+    <reapack name="ajsfx_SetAllSelectedItemsLengthToFirstSelectedItem.lua" type="script" desc="Set All Selected Items Length To First Selected Item">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Sets the length of all selected media items to match the length of the first selected item.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.1" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Items/ajsfx_SetAllSelectedItemsLengthToFirstSelectedItem.lua</source>
+      </version>
+    </reapack>
+    <reapack name="ajsfx_ToggleMuteSelectedItemsOrTracks.lua" type="script" desc="Smart Toggle Mute (Razor &gt; Items &gt; Tracks)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Toggles mute intelligently. Priority: 1. Razor Edits (mutes items in area), 2. Selected Items, 3. Selected Tracks.\par}
+}
+]]></description>
+      </metadata>
+      <version name="2.1" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Items/ajsfx_ToggleMuteSelectedItemsOrTracks.lua</source>
+      </version>
+    </reapack>
+  </category>
+  <category name="scripts/Track">
+    <reapack name="ajsfx_ProjectBuilder.lua" type="script" desc="Project Builder">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Scaffold multi-group track architectures from a GUI \u8212- folder tracks with FX aux routing and section-based naming.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Track/ajsfx_ProjectBuilder.lua</source>
+      </version>
+    </reapack>
+    <reapack name="ajsfx_Track_CollapseVisibleChildrenAtHighestSelectedLevel.lua" type="script" desc="Collapse Visible Children At Highest Selected Level">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Collapses all folder tracks at the same depth as the deepest selected track.\par}
+}
+]]></description>
+      </metadata>
+      <version name="2.1" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Track/ajsfx_Track_CollapseVisibleChildrenAtHighestSelectedLevel.lua</source>
+      </version>
+    </reapack>
+    <reapack name="ajsfx_Track_CollapseVisibleChildrenAtLowestSelectedLevel.lua" type="script" desc="Collapse Visible Children At Lowest Selected Level">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Collapses all folder tracks at the same depth as the shallowest selected track.\par}
+}
+]]></description>
+      </metadata>
+      <version name="2.1" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Track/ajsfx_Track_CollapseVisibleChildrenAtLowestSelectedLevel.lua</source>
+      </version>
+    </reapack>
+    <reapack name="ajsfx_Track_UnCollapseVisibleChildrenAtHighestSelectedLevel.lua" type="script" desc="Uncollapse Visible Children At Highest Selected Level">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Uncollapses all folder tracks at the same depth as the deepest selected track.\par}
+}
+]]></description>
+      </metadata>
+      <version name="2.1" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Track/ajsfx_Track_UnCollapseVisibleChildrenAtHighestSelectedLevel.lua</source>
+      </version>
+    </reapack>
+    <reapack name="ajsfx_Track_UnCollapseVisibleChildrenAtLowestSelectedLevel.lua" type="script" desc="Uncollapse Visible Children At Lowest Selected Level">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Uncollapses all folder tracks at the same depth as the shallowest selected track.\par}
+}
+]]></description>
+      </metadata>
+      <version name="2.1" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Track/ajsfx_Track_UnCollapseVisibleChildrenAtLowestSelectedLevel.lua</source>
+      </version>
+    </reapack>
+    <reapack name="ajsfx_TrackVersioning.lua" type="script" desc="Track Versioning: Duplicate, Increment Version, and Archive Old">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Automates track versioning: Duplicates selected tracks, increments version/date on the original, and archives the duplicate in an "Old" folder. Configurable via ExtState.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="ajsfx" time="2026-04-17T07:34:27Z">
+        <source main="main">https://github.com/ajohnsonsfx/ajsfx/raw/5d2bb76005a4acf522785174176ae2d286063e21/scripts/Track/ajsfx_TrackVersioning.lua</source>
       </version>
     </reapack>
   </category>
