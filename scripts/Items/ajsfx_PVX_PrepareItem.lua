@@ -107,9 +107,14 @@ if not host_fx_idx then
   -- "JS: " prefix is required by TakeFX_AddByName to match JSFX files by type+name
   local added_idx = r.TakeFX_AddByName(take, "JS: ajsfx PVX Host", 0, -1)
   if added_idx < 0 then
-    core.Error("Could not add 'ajsfx PVX Host' to the take FX chain.\n" ..
-               "Make sure the JSFX is installed in your REAPER Effects folder.\n" ..
-               "Expected name: 'ajsfx PVX Host' (from ajsfx_PVXHost.jsfx).")
+    core.Error("Could not add 'ajsfx PVX Host' to the take FX chain.\n\n" ..
+               "To fix:\n" ..
+               "1. In ReaPack, reinstall 'ajsfx PVX Host' (v0.2+).\n" ..
+               "   It must install to: Effects/ajsfx/pvx/ajsfx_PVXHost.jsfx\n" ..
+               "   (NOT the Scripts folder)\n" ..
+               "2. After reinstalling, rescan REAPER plugins:\n" ..
+               "   Options > Preferences > Plug-ins > Re-scan\n" ..
+               "3. Re-run this script.")
     return
   end
   host_fx_idx = added_idx
