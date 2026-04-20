@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="ajsfx" commit="a913cf9f69eda67aab50de870d33ca23060bc650">
-  <category name="scripts/FX">
+<index version="1" name="ajsfx" commit="1b7217d924cb13497ee3eefc09c3844ff9ac73c3">
+  <category name="ajsfx/pvx">
     <reapack name="ajsfx_PVXHost.jsfx" type="effect" desc="ajsfx PVX Host">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
@@ -11,8 +11,8 @@
 }
 ]]></description>
       </metadata>
-      <version name="0.1" author="ajsfx" time="2026-04-14T04:44:13Z">
-        <source>https://github.com/ajohnsonsfx/ajsfx/raw/226de6287a5166466ce8e68ae5264e7ab9e7065b/scripts/FX/ajsfx_PVXHost.jsfx</source>
+      <version name="0.2" author="ajsfx" time="2026-04-20T05:12:57Z">
+        <source>https://github.com/ajohnsonsfx/ajsfx/raw/1b7217d924cb13497ee3eefc09c3844ff9ac73c3/ajsfx/pvx/ajsfx_PVXHost.jsfx</source>
       </version>
     </reapack>
   </category>
