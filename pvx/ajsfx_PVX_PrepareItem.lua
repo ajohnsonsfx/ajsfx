@@ -106,13 +106,19 @@ if already_has_host then
 end
 
 if not host_fx_idx then
-  -- Resolved by JSFX desc line ("desc:ajsfx PVX Host"), so this is
-  -- independent of where the .jsfx file lives on disk.
+  -- Try by desc first (works after REAPER has scanned the Effects folder).
+  -- Fall back to the direct install path so the JSFX can be added immediately
+  -- after a ReaPack install without requiring a manual FX rescan.
   local added_idx = r.TakeFX_AddByName(take, "JS: ajsfx PVX Host", 0, -1)
+  if added_idx < 0 then
+    added_idx = r.TakeFX_AddByName(take, "JS: ajsfx-ReaScripts/pvx/ajsfx_PVXHost", 0, -1)
+  end
   if added_idx < 0 then
     core.Error("Could not add 'ajsfx PVX Host' to the take FX chain.\n\n" ..
                "To fix:\n" ..
-               "1. In ReaPack, install/reinstall 'ajsfx PVX Host'.\n" ..
+               "1. In ReaPack, install/reinstall 'ajsfx PVX Host' (v0.3+).\n" ..
+               "   The effect installs to:\n" ..
+               "   Effects/ajsfx-ReaScripts/pvx/ajsfx_PVXHost.jsfx\n" ..
                "2. Rescan REAPER plug-ins:\n" ..
                "   Options > Preferences > Plug-ins > Re-scan\n" ..
                "3. Re-run this script.")
