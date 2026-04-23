@@ -1,6 +1,7 @@
 -- @description ajsfx PVX Preview
 -- @author ajsfx
 -- @version 0.3
+-- @changelog Fix binary resolution (use GetPVXBinary instead of raw config field); remove invalid --start/--end flags that pvx voc does not accept; seek preview playback to edit cursor via CF_Preview_SetValue; wire phase-lock and transient-preserve sliders through to pvx CLI; delegate envelope sampling to shared SampleAndEmitCurve helper
 -- @about Previews the pvx-processed output for the selected audio item without
 --        mutating the project. Currently processes the full item; playback seeks
 --        to the edit cursor (or time-selection start) so you hear the window of

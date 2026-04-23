@@ -71,5 +71,10 @@ This project uses a standard `dev` to `main` workflow for versioning and release
 1.  **Work in `dev`**: All development starts in the `dev` branch.
 2.  **Test**: `./run_tests.sh` must pass; also exercise changes in REAPER.
 3.  **Bump `@version` tags**: Update the `@version` metadata tag in the script headers for any modified scripts.
-4.  **Merge `dev` into `main`**: Once changes are stable and tested, merge the `dev` branch into `main`.
-5.  **CI handles the rest**: `.github/workflows/reapack.yml` runs the test suite and, on success, rebuilds `index.xml` via `reapack-index --rebuild --commit` and pushes it back to `main`. No manual `reapack-index` step is required post-merge; if CI's test job fails, fix the regression before the index will update.
+4.  **Add `@changelog` to each modified script**: Immediately below the `@version` line in the script header, add or update the `@changelog` tag with a plain-English summary of what changed in this version. CI extracts this tag and writes it into `index.xml` — without it, ReaPack shows a blank changelog to users.
+    ```lua
+    -- @version 0.5
+    -- @changelog Fix fallback path for TakeFX when no track FX present
+    ```
+5.  **Merge `dev` into `main`**: Once changes are stable and tested, merge the `dev` branch into `main`.
+6.  **CI handles the rest**: `.github/workflows/reapack.yml` runs the test suite and, on success, rebuilds `index.xml` via `reapack-index --rebuild --commit` and pushes it back to `main`. No manual `reapack-index` step is required post-merge; if CI's test job fails, fix the regression before the index will update.

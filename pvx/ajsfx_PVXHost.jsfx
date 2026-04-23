@@ -2,6 +2,7 @@ desc:ajsfx PVX Host
 // @description ajsfx PVX Host
 // @author ajsfx
 // @version 0.4
+// @changelog Relabel slider3 from Sinc to S-Curve to match pvx CLI; simplify slider4 Phase Lock from 3 positions to Off/On matching pvx --phase-locking vocabulary
 // @about Placeholder FX exposing automation lanes for PVX Render/Preview.
 
 slider1:0<-24,24,0.01>Pitch (semitones)

@@ -26,3 +26,4 @@ See `.agents/reaper_api.md` for common API functions and state change usage.
 - Tests are located in `tests/` utilizing a mock REAPER environment (`tests/mock_reaper.lua`).
 - Run tests using `./run_tests.sh`.
 - CI (`.github/workflows/reapack.yml`) runs the test suite on every push and PR, and gates the auto-rebuild of `index.xml` on tests passing. To release, merge `dev` → `main`; CI rebuilds and pushes `index.xml` itself — no manual `reapack-index` needed post-merge.
+- When bumping `@version`, always add or update `@changelog` in the same script header — CI reads it to populate the ReaPack changelog shown to users.

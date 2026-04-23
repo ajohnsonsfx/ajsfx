@@ -1,6 +1,7 @@
 -- @description Media Item Counter Settings
 -- @author ajsfx
 -- @version 1.4
+-- @changelog Delegate config saving to core.SaveMediaCounterConfig; remove local SaveConfig duplicate
 -- @about Settings panel for ajsfx_MediaItemCounter
 -- @provides
 --   [main] .

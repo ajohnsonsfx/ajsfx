@@ -1,6 +1,7 @@
 -- @description Track Versioning: Duplicate, Increment Version, and Archive Old
 -- @author ajsfx
 -- @version 1.0
+-- @changelog Remove roadmap TODO comments from script header
 -- @about Automates track versioning: Duplicates selected tracks, increments version/date on the original, and archives the duplicate in an "Old" folder. Configurable via ExtState.
 -- @provides
 --   [main] .

@@ -1,6 +1,7 @@
 -- @description ajsfx PVX Settings
 -- @author ajsfx
 -- @version 0.2
+-- @changelog Add Envelope Rate (Hz) setting; simplify Reset button logic
 -- @about Settings panel for ajsfx PVX Render/Preview. Configure the pvx binary
 --        path, scratch directory, poll rate, preview duration, and render timeout.
 -- @provides

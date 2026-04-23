@@ -1,6 +1,7 @@
 -- @description ajsfx Core Library
 -- @author ajsfx
 -- @version 1.1
+-- @changelog Add SaveMediaCounterConfig to complement LoadMediaCounterConfig
 -- @about Shared functions for ajsfx scripts
 
 local r = reaper

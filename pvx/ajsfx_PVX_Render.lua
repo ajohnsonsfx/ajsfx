@@ -1,6 +1,7 @@
 -- @description ajsfx PVX Render
 -- @author ajsfx
 -- @version 0.3
+-- @changelog Fix binary resolution (use GetPVXBinary instead of raw config field); wire phase-lock and transient-preserve sliders through to pvx CLI; delegate envelope sampling to shared SampleAndEmitCurve helper; post-PVX FX detection now aborts with error instead of silently producing wrong output
 -- @about Applies time-varying pitch/stretch to the selected audio item via pvx.
 --        Renders a new take on the source item. Requires ajsfx PVX Host on the take FX chain.
 -- @provides
